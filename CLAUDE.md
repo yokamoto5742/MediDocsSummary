@@ -69,7 +69,7 @@ npm run typecheck
 
 ## Architecture
 
-This is a FastAPI application for generating Japanese medical referral documents (診療情報提供書) using Claude and Gemini AI models.
+This is a FastAPI application for generating Japanese medical summary documents (退院時サマリ) using Claude and Gemini AI models.
 
 ### Layer structure
 
