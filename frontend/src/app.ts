@@ -32,8 +32,8 @@ interface AppState {
     evaluationElapsedTime: number;
     evaluationTimerInterval: ReturnType<typeof setInterval> | null;
     init(): Promise<void>;
-    updateReferralPurpose(): void;
     updateDoctors(): Promise<void>;
+    updateSelectedModel(): Promise<void>;
     startTimer(): void;
     stopTimer(): void;
     generateSummary(): Promise<void>;
@@ -79,7 +79,6 @@ export function appState(): AppState {
 
         // Form
         form: {
-            referralPurpose: '',
             currentPrescription: '',
             medicalText: '',
             additionalInfo: ''
@@ -115,14 +114,7 @@ export function appState(): AppState {
 
         async init() {
             await this.updateDoctors();
-            this.updateReferralPurpose();
             await this.updateSelectedModel();
-        },
-
-        updateReferralPurpose() {
-            if (window.DOCUMENT_PURPOSE_MAPPING && window.DOCUMENT_PURPOSE_MAPPING[this.settings.documentType]) {
-                this.form.referralPurpose = window.DOCUMENT_PURPOSE_MAPPING[this.settings.documentType];
-            }
         },
 
         async updateDoctors() {
@@ -196,7 +188,6 @@ export function appState(): AppState {
                     method: 'POST',
                     headers: getHeaders({ 'Content-Type': 'application/json' }),
                     body: JSON.stringify({
-                        referral_purpose: this.form.referralPurpose,
                         current_prescription: this.form.currentPrescription,
                         medical_text: this.form.medicalText,
                         additional_info: this.form.additionalInfo,
@@ -316,7 +307,6 @@ export function appState(): AppState {
                 method: 'POST',
                 headers: getHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify({
-                    referral_purpose: this.form.referralPurpose,
                     current_prescription: this.form.currentPrescription,
                     medical_text: this.form.medicalText,
                     additional_info: this.form.additionalInfo,
@@ -348,7 +338,6 @@ export function appState(): AppState {
 
         clearForm() {
             this.form = {
-                referralPurpose: '',
                 currentPrescription: '',
                 medicalText: '',
                 additionalInfo: ''

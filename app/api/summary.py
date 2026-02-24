@@ -22,7 +22,6 @@ def generate_summary(http_request: Request, request: SummaryRequest):
     return execute_summary_generation(
         medical_text=request.medical_text,
         additional_info=request.additional_info,
-        referral_purpose=request.referral_purpose,
         current_prescription=request.current_prescription,
         department=request.department,
         doctor=request.doctor,
@@ -40,7 +39,6 @@ async def generate_summary_stream(http_request: Request, request: SummaryRequest
     event_generator = execute_summary_generation_stream(
         medical_text=request.medical_text,
         additional_info=request.additional_info,
-        referral_purpose=request.referral_purpose,
         current_prescription=request.current_prescription,
         department=request.department,
         doctor=request.doctor,

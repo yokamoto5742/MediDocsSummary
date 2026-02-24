@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}診療情報提供書作成アプリ{% endblock %}</title>
+    <title>{% block title %}退院時サマリ作成アプリ{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 
     <link rel="stylesheet" href="/static/dist/css/main.css">
@@ -48,9 +48,6 @@
     </div>
     <script>
         // テンプレートからJavaScriptへデータを渡す
-        {% if document_purpose_mapping %}
-        window.DOCUMENT_PURPOSE_MAPPING = {{ document_purpose_mapping | tojson }};
-        {% endif %}
         {% if csrf_token %}
         window.CSRF_TOKEN = {{ csrf_token | tojson }};
         {% endif %}

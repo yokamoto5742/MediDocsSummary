@@ -31,7 +31,7 @@ class TestBuildEvaluationPrompt:
         assert prompt_template in result
         assert "【カルテ記載】" in result
         assert input_text in result
-        assert "【現在の処方】" in result
+        assert "【退院時処方(現在の処方)】" in result
         assert current_prescription in result
         assert "【追加情報】" in result
         assert additional_info in result
@@ -291,7 +291,7 @@ class TestExecuteEvaluation:
         call_args = mock_client._generate_content.call_args[0][0]
         assert "詳細な評価プロンプト" in call_args
         assert "【カルテ記載】" in call_args
-        assert "【現在の処方】" in call_args
+        assert "【退院時処方(現在の処方)】" in call_args
         assert "【追加情報】" in call_args
         assert "【生成された出力】" in call_args
 

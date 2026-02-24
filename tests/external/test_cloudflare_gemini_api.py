@@ -349,7 +349,6 @@ class TestCloudflareGeminiAPIClientIntegration:
         result = client.generate_summary(
             medical_text="患者情報",
             additional_info="追加情報",
-            referral_purpose="検査依頼",
             current_prescription="薬剤A",
             department="内科",
             document_type="他院への紹介",

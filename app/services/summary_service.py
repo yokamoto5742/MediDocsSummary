@@ -55,7 +55,6 @@ def validate_input(medical_text: str) -> tuple[bool, str | None]:
 def execute_summary_generation(
     medical_text: str,
     additional_info: str,
-    referral_purpose: str,
     current_prescription: str,
     department: str,
     doctor: str,
@@ -78,7 +77,6 @@ def execute_summary_generation(
     # サニタイゼーション適用
     medical_text = sanitize_medical_text(medical_text)
     additional_info = sanitize_medical_text(additional_info or "")
-    referral_purpose = sanitize_medical_text(referral_purpose)
     current_prescription = sanitize_medical_text(current_prescription or "")
 
     # 入力検証
@@ -131,7 +129,6 @@ def execute_summary_generation(
             provider=provider,
             medical_text=medical_text,
             additional_info=additional_info,
-            referral_purpose=referral_purpose,
             current_prescription=current_prescription,
             department=department,
             document_type=document_type,
@@ -190,7 +187,6 @@ def _run_sync_generation(
     provider: str,
     medical_text: str,
     additional_info: str,
-    referral_purpose: str,
     current_prescription: str,
     department: str,
     document_type: str,
@@ -202,7 +198,6 @@ def _run_sync_generation(
         provider=provider,
         medical_text=medical_text,
         additional_info=additional_info,
-        referral_purpose=referral_purpose,
         current_prescription=current_prescription,
         department=department,
         document_type=document_type,
@@ -222,7 +217,6 @@ def _run_sync_generation(
 async def execute_summary_generation_stream(
     medical_text: str,
     additional_info: str,
-    referral_purpose: str,
     current_prescription: str,
     department: str,
     doctor: str,
@@ -245,7 +239,6 @@ async def execute_summary_generation_stream(
     # サニタイゼーション適用
     medical_text = sanitize_medical_text(medical_text)
     additional_info = sanitize_medical_text(additional_info or "")
-    referral_purpose = sanitize_medical_text(referral_purpose)
     current_prescription = sanitize_medical_text(current_prescription or "")
 
     # 入力検証
@@ -304,7 +297,7 @@ async def execute_summary_generation_stream(
     async for item in stream_with_heartbeat(
         sync_func=_run_sync_generation,
         sync_func_args=(
-            provider, medical_text, additional_info, referral_purpose,
+            provider, medical_text, additional_info,
             current_prescription, department, document_type, doctor, model_name
         ),
         start_message=MESSAGES["STATUS"]["DOCUMENT_GENERATION_START"],

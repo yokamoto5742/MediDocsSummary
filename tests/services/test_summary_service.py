@@ -283,7 +283,6 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text="患者は60歳男性。2型糖尿病にて加療中。",
             additional_info="HbA1c 7.5%",
-            referral_purpose="血糖コントロール",
             current_prescription="メトホルミン500mg",
             department="default",
             doctor="default",
@@ -312,7 +311,7 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text="",  # 空文字列
             additional_info="",
-            referral_purpose="",
+
             current_prescription="",
             department="default",
             doctor="default",
@@ -345,7 +344,7 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text=long_text,
             additional_info="",
-            referral_purpose="",
+
             current_prescription="",
             department="default",
             doctor="default",
@@ -368,7 +367,7 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text="テストデータ" * 10,
             additional_info="",
-            referral_purpose="",
+
             current_prescription="",
             department="default",
             doctor="default",
@@ -400,7 +399,7 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text="テストデータ" * 10,
             additional_info="",
-            referral_purpose="",
+
             current_prescription="",
             department="default",
             doctor="default",
@@ -447,7 +446,7 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text=long_text,
             additional_info="",
-            referral_purpose="",
+
             current_prescription="",
             department="default",
             doctor="default",
@@ -484,7 +483,6 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text="患者データ" * 10,
             additional_info="追加情報" * 10,
-            referral_purpose="精査依頼",
             current_prescription="処方内容",
             department="眼科",
             doctor="橋本義弘",
@@ -497,7 +495,6 @@ class TestExecuteSummaryGeneration:
         # generate_summary が正しい引数で呼ばれることを確認
         call_args = mock_generate_summary_with_provider.call_args[1]
         assert call_args["additional_info"] == "追加情報" * 10
-        assert call_args["referral_purpose"] == "精査依頼"
         assert call_args["current_prescription"] == "処方内容"
         assert call_args["department"] == "眼科"
         assert call_args["doctor"] == "橋本義弘"
@@ -536,7 +533,7 @@ class TestExecuteSummaryGeneration:
         result = execute_summary_generation(
             medical_text="テストデータ" * 10,
             additional_info="",
-            referral_purpose="",
+
             current_prescription="",
             department="default",
             doctor="default",

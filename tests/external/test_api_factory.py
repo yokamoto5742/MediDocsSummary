@@ -187,8 +187,7 @@ class TestGenerateSummaryWithProvider:
         call_args = mock_generate.call_args[0]
         assert call_args[0] == "患者情報"
         assert call_args[1] == ""  # additional_info
-        assert call_args[2] == ""  # referral_purpose
-        assert call_args[3] == ""  # current_prescription
+        assert call_args[2] == ""  # current_prescription
 
     @patch("app.external.api_factory.get_settings")
     @patch.object(GeminiAPIClient, "generate_summary")
@@ -206,7 +205,6 @@ class TestGenerateSummaryWithProvider:
             provider="gemini",
             medical_text="カルテ情報",
             additional_info="追加情報",
-            referral_purpose="精査依頼",
             current_prescription="処方内容",
             department="眼科",
             document_type="他院への紹介",
