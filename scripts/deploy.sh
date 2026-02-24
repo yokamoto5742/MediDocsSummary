@@ -7,9 +7,9 @@ set -euo pipefail
 # ==============================================================
 
 REGION="ap-northeast-1"
-ECR_REPO="medidocs-referral"
+ECR_REPO="medidocs-summary"
 CLUSTER="medidocs-cluster"
-SERVICE="medidocs-referral-service"
+SERVICE="medidocs-summary-service"
 TAG="${TAG:-latest}"
 ACCOUNT_ID="${ACCOUNT_ID:-}"
 
