@@ -65,7 +65,7 @@ AWSコンソール → **ECS** → `medidocs-cluster` → `medidocs-referral-ser
 
 「更新」をクリック。タスクが新しいサブネットで起動するまで待機（3〜5分）。
 
-### 1-3. Referral動作確認
+### 1-3. Referral動作確認(院内ネットワークから)
 
 ```bash
 curl https://referral.medidocslm.com/health
@@ -233,21 +233,9 @@ AWSコンソール → **Route 53** → 「ホストゾーン」 → `medidocslm
 
 ---
 
-## STEP 7: DBマイグレーション（必要な場合）
+## STEP 7: DBマイグレーションは不要
 
-DBは `medidocs` を共有しているため、Referralデプロイ時に既存テーブルが作成済みであれば不要。
-
-Summaryに固有のテーブルが存在する場合のみ実行:
-
-> ⚠️ RDSはプライベートサブネットに配置されているため、ローカルから直接接続不可。
-> Systems Manager Session Manager（踏み台不要）またはEC2踏み台経由で実行する。
-
-```bash
-# ローカルの .env を本番設定に切り替えてから実行
-alembic upgrade head
-```
-
----
+DBは `medidocs` を共有しているため、Referralデプロイ時に既存テーブルが作成済み。
 
 ## STEP 8: 動作確認チェックリスト
 
