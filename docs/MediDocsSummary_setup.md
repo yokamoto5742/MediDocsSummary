@@ -40,7 +40,7 @@ aws sts get-caller-identity --query Account --output text
 
 > Summaryデプロイ前に既存のReferralを移行して、全ECSサービスの構成を統一する
 
-### 1-1. プライベートサブネットのルートテーブル確認
+### 1-1. プライベートサブネットのルートテーブル確認(一旦保留)
 
 AWSコンソール → **VPC** → 「ルートテーブル」
 
