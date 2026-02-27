@@ -79,11 +79,6 @@ class Settings(BaseSettings):
     gemini_thinking_level: str = "HIGH"
     gemini_evaluation_model: str | None = None
 
-    # Cloudflare AI Gateway
-    cloudflare_account_id: str | None = None
-    cloudflare_gateway_id: str | None = None
-    cloudflare_aig_token: str | None = None
-
     # Application
     max_input_tokens: int = 200000
     min_input_tokens: int = 100
