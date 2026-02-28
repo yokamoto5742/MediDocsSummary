@@ -15,11 +15,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 カスタムモジュール 
 それぞれアルファベット順に並べます。importが先でfromは後です。
 
-## Automatic Notifications (Hooks)
-自動通知は`.claude/settings.local.json` で設定済：
-- **Stop Hook**: ユーザーがClaude Codeを停止した時に「作業が完了しました」と通知
-- **SessionEnd Hook**: セッション終了時に「Claude Code セッションが終了しました」と通知
-
 ## クリーンコードガイドライン
 - 関数のサイズ：関数は50行以下に抑えることを目標にしてください。関数の処理が多すぎる場合は、より小さな関数に分割してください。
 - 単一責任：各関数とモジュールには明確な目的が1つあるようにします。無関係なロジックをまとめないでください。
@@ -29,111 +24,113 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - コメントとdocstringは必要最小限に日本語で記述します。文末に"。"や"."をつけないでください。
 - このアプリのUI画面で表示するメッセージはすべて日本語にします。app/core/constants.pyで一元管理します。
 
-## Commands
+## 概要
 
-### Backend
+退院時サマリ作成アプリ。FastAPI + PostgreSQL バックエンド、Vite + TypeScript + Alpine.js フロントエンド。Claude（AWS Bedrock）と Gemini（Google Vertex AI）の両プロバイダーに対応。
+
+## よく使うコマンド
+
+### バックエンド
+
 ```bash
-# Dev server
+# 開発サーバー起動
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Run all tests
+# テスト実行（全件）
 python -m pytest tests/ -v --tb=short
 
-# Run a single test file
+# テスト実行（単一ファイル）
 python -m pytest tests/services/test_summary_service.py -v
 
-# Run a single test
+# テスト実行（単一テスト）
 python -m pytest tests/services/test_summary_service.py::test_generate_summary -v
 
-# Coverage
+# カバレッジ付きテスト
 python -m pytest tests/ -v --tb=short --cov=app --cov-report=html
 
-# Type checking (checks app/ only, excludes tests/ and scripts/)
+# 型チェック（app/ のみ対象）
 pyright
 ```
 
-### Database migrations (Alembic)
+### フロントエンド
+
+```bash
+cd frontend
+npm install
+npm run dev        # 開発サーバー（ポート5173、/api を localhost:8000 にプロキシ）
+npm run build      # 本番ビルド → ../app/static/dist/ に出力
+npm run typecheck  # TypeScript 型チェック
+```
+
+### データベースマイグレーション
+
 ```bash
 alembic revision --autogenerate -m "説明"
 alembic upgrade head
 alembic downgrade -1
 ```
 
-### Frontend
-```bash
-cd frontend && npm install
-npm run dev      # Vite dev server
-npm run build    # Production build
-npm run typecheck
-```
+## アーキテクチャ
 
-## Architecture
-
-This is a FastAPI application for generating Japanese medical summary documents (退院時サマリ) using Claude and Gemini AI models.
-
-### Layer structure
+### レイヤー構成
 
 ```
-Request → API router (app/api/) → Service layer (app/services/) → External API (app/external/)
-                                         ↓
-                               Database (app/models/)
+API層 (app/api/)       → HTTPルーティングのみ
+Service層 (app/services/) → ビジネスロジック
+External層 (app/external/) → AI API呼び出し
+Model層 (app/models/)  → SQLAlchemy ORM
 ```
 
-- **`app/api/`** — FastAPI route handlers. All state-changing routes (POST/PUT/DELETE) require CSRF validation via `X-CSRF-Token` header.
-- **`app/services/`** — Business logic separated from routes. `summary_service.py` orchestrates the full document generation pipeline.
-- **`app/external/`** — AI API clients. `api_factory.py` is the entry point; use `create_client(APIProvider)` to get the right client.
-- **`app/models/`** — SQLAlchemy ORM models backed by PostgreSQL.
-- **`app/schemas/`** — Pydantic v2 request/response schemas.
-- **`app/core/constants.py`** — Single source of truth for all constants and user-facing messages.
+### AI プロバイダー
 
-### Settings loading
+- `app/external/api_factory.py` の `create_client(APIProvider)` でクライアントを動的生成
+- `ClaudeAPIClient`（AWS Bedrock）と `GeminiAPIClient`（Vertex AI）は `BaseAPIClient` を継承
+- `app/services/model_selector.py` で入力文字数が `MAX_TOKEN_THRESHOLD`（デフォルト100,000文字）を超えた場合、Claude → Gemini に自動切り替え
 
-`app/core/config.py::get_settings()` is `@lru_cache`-cached. On startup it tries to pull secrets from AWS Secrets Manager (`AWS_SECRET_NAME` env var, default `medidocs/prod`), then falls back to `.env`. Existing env vars are never overwritten by Secrets Manager.
+### 階層的プロンプト解決
 
-### Database sessions
+`prompt_service.get_prompt()` で以下の順序でDBを検索：
+1. 診療科 + 医師 + 文書タイプ固有
+2. 診療科 + デフォルト医師 + 文書タイプ
+3. デフォルト診療科 + デフォルト医師 + 文書タイプ
+4. フォールバック: `constants.py` の `DEFAULT_SUMMARY_PROMPT`
 
-Two patterns are used:
-- `get_db()` — FastAPI `Depends()` injection for route handlers
-- `get_db_session()` — `contextmanager` for use inside service layer functions (commits on exit, rolls back on exception)
+### 設定管理
 
-Tests override `get_db` via `app.dependency_overrides` and use SQLite in-memory.
+- `app/core/config.py` の `Settings`（pydantic-settings）が `.env` ファイルを読み込み
+- `get_settings()` は `@lru_cache` でシングルトン
+- 優先順位: OS環境変数 → AWS Secrets Manager（`AWS_SECRET_NAME` で指定）→ `.env`
 
-### AI provider selection and auto-switching
+### 定数管理
 
-`model_selector.py::determine_model()` handles model selection:
-1. If `model_explicitly_selected=False`, queries DB for per-doctor/department model preference
-2. If input exceeds `MAX_TOKEN_THRESHOLD` (default 100,000 chars) and Claude is selected, auto-switches to Gemini
-3. `api_factory.create_client()` picks `CloudflareGeminiAPIClient` when all three Cloudflare env vars are set, otherwise uses direct `GeminiAPIClient`/`ClaudeAPIClient`
+`app/core/constants.py` で一元管理：
+- `ModelType` Enum: `"Claude"`, `"Gemini_Pro"`
+- `MESSAGES` dict: カテゴリ別の日本語メッセージ（`get_message(category, key, **kwargs)` で取得）
+- `FRONTEND_MESSAGES`: テンプレートに渡す用のメッセージサブセット
+- マジック文字列を使わず必ず定数を参照すること
 
-### Hierarchical prompt resolution
+### データフロー
 
-When building the AI prompt, `prompt_service.get_prompt()` resolves in priority order:
-1. Doctor + document type specific prompt
-2. Department + document type specific prompt
-3. Document type default prompt
-4. `DEFAULT_SUMMARY_PROMPT` constant
+1. フロントエンド（Alpine.js）→ POST `/api/summary`
+2. `SummaryService` がプロンプト解決・モデル選択・API呼び出しを調整
+3. `text_processor.py` がAI出力をセクション分割
+4. 使用統計（トークン数・時間・コスト）を `usage` テーブルに保存
+5. SSE（Server-Sent Events）でストリーミング返却
 
-### Document generation (SSE streaming)
+### セキュリティ
 
-`/api/summary/stream` uses Server-Sent Events. `sse_helpers.stream_with_heartbeat()` runs the synchronous AI API call in a thread pool while sending periodic heartbeat events to keep the connection alive.
+- CSRF トークン: 状態変更エンドポイント（POST/PUT/DELETE）で `X-CSRF-Token` ヘッダー必須
+- 入力サニタイゼーション: `app/utils/input_sanitizer.py`（プロンプトインジェクション検出）
+- セキュリティヘッダー: `SecurityHeadersMiddleware`（`app/core/security.py`）
+- 監査ログ: `app/utils/audit_logger.py`（PHI は記録しない）
 
-### Constants and messages
+## コーディング規約
 
-All strings shown to users or logged must come from `app/core/constants.py`. Use `get_message(category, key, **kwargs)` to retrieve with placeholder substitution. Categories: `ERROR`, `CONFIG`, `VALIDATION`, `SUCCESS`, `STATUS`, `INFO`, `CONFIRM`, `LOG`, `AUDIT`. `FRONTEND_MESSAGES` is a curated subset passed to Jinja2 templates.
+- 型ヒント必須（パラメータと戻り値）
+- コメントは複雑なロジックのみ日本語で記述（文末に句点不要）
+- 関数は50行以下を目標
+- インポート順: 標準ライブラリ → サードパーティ → ローカル（各グループ内アルファベット順、`import` 先・`from` 後）
 
-## Testing
+## コミットメッセージ形式
 
-- Tests run with `asyncio_mode = auto` (pytest-asyncio).
-- The `test_db` fixture (SQLite in-memory) is **function-scoped** and automatically overrides the `get_db` dependency.
-- The `client` fixture depends on `test_db` and returns a `TestClient`.
-- The `csrf_headers` fixture provides the `X-CSRF-Token` header required for mutating endpoints.
-- External AI API calls must be mocked with `pytest-mock`; never call real APIs in tests.
-
-## Code conventions
-
-- All functions must have type hints (parameters and return type).
-- Never use magic strings — reference `app/core/constants.py`.
-- Comments written in Japanese only when logic is non-obvious; no trailing 句点（。）.
-- Import order: stdlib → third-party → local, alphabetical within each group (`import` before `from`).
-- Keep functions under 50 lines.
-- Commit format: `✨ feat`, `🐛 fix`, `📝 docs`, `♻️ refactor`, `✅ test` with Japanese description.
+`✨ feat`, `🐛 fix`, `📝 docs`, `♻️ refactor`, `✅ test` プレフィックスを使用し、変更内容と理由を日本語で記述。
