@@ -34,17 +34,16 @@
 - **プロンプトインジェクション対策**: 多層的な入力検証とサニタイゼーション
 - **CORS制御**: 環境変数ベースの柔軟なクロスオリジン設定
 - **セキュリティヘッダー**: XSS、クリックジャッキング、MIME スニッフィング対策
-- **監査ログ**: 医療操作のセキュリティイベント記録
+- **監査ログ**: 文書作成操作のセキュリティイベント記録
 
 ## 前提条件
 
 - **Python** 3.13以上
 - **PostgreSQL** 16以上
 - **Node.js** 18以上（フロントエンド開発用）
-- **AI APIアカウント**（以下のうち少なくとも1つ）:
+- **AI APIアカウント**:
   - AWS Bedrockアクセス権限（Claude API用）
   - Google Cloud PlatformアカウントにVertex AI有効化（Gemini API用）
-  - Cloudflare AI Gateway（オプション、APIプロキシング用）
 
 ## インストール
 
@@ -132,14 +131,6 @@ GEMINI_EVALUATION_MODEL=gemini-2.0-flash
 GEMINI_THINKING_LEVEL=HIGH
 ```
 
-### Cloudflare AI Gateway設定
-```env
-# Cloudflare設定が全て揃うとCloudflareを経由したGemini APIを使用
-CLOUDFLARE_ACCOUNT_ID=your_account_id
-CLOUDFLARE_GATEWAY_ID=your_gateway_id
-CLOUDFLARE_AIG_TOKEN=your_aig_token
-```
-
 ### アプリケーション設定
 ```env
 # トークン制限
@@ -149,21 +140,10 @@ MAX_TOKEN_THRESHOLD=100000
 
 # 機能設定
 PROMPT_MANAGEMENT=true
-APP_TYPE=default
-SELECTED_AI_MODEL=Claude
 
 # CSRF認証
 CSRF_SECRET_KEY=your_secret_key
-CSRF_TOKEN_EXPIRE_MINUTES=60
 
-# CORS設定
-CORS_ORIGINS=["http://localhost:8000","http://127.0.0.1:8000"]
-CORS_ALLOW_CREDENTIALS=true
-CORS_ALLOW_METHODS=["GET","POST","PUT","DELETE","OPTIONS"]
-CORS_ALLOW_HEADERS=["*"]
-
-# AWS Secrets Manager（オプション）
-AWS_SECRET_NAME=medidocs/prod
 ```
 
 ## 使用方法
@@ -238,8 +218,7 @@ app/
 │   ├── api_factory.py     # APIクライアント動的生成関数
 │   ├── base_api.py        # ベースAPIクライアント
 │   ├── claude_api.py      # Claude/Bedrock連携
-│   ├── gemini_api.py      # Gemini/Vertex AI連携
-│   └── cloudflare_gemini_api.py   # Cloudflareを経由したGemini
+│   └── gemini_api.py      # Gemini/Vertex AI連携
 ├── models/                # SQLAlchemy ORM モデル
 │   ├── base.py            # ベースモデル
 │   ├── prompt.py          # プロンプトテンプレート
@@ -347,8 +326,7 @@ result = client.generate_summary(medical_text, additional_info, ...)
 **インスタンス化**:
 
 - `api_factory.create_client(APIProvider)` で適切なクライアントを動的に生成
-- Cloudflare設定が全て揃うと CloudflareGeminiAPIClient/CloudflareClaudeAPIClient を使用
-- それ以外は GeminiAPIClient/ClaudeAPIClient を使用
+- GeminiAPIClient/ClaudeAPIClient を使用
 
 ### データフロー
 
@@ -454,7 +432,6 @@ pyright
 ### AI/ML統合
 - **AWS Bedrock**: Claude API へのアクセス
 - **Google Vertex AI**: Gemini API への統合
-- **Cloudflare AI Gateway**: API プロキシング
 
 ### フロントエンド
 - **Vite**: 高速フロントエンドビルドツール
@@ -467,6 +444,7 @@ pyright
 - **pytest**: テストフレームワーク
 - **pytest-cov**: カバレッジレポート
 - **pytest-mock**: モックライブラリ
+- **pytest-asyncio**:非同期処理テストプラグイン
 - **pyright**: Python静的型チェッカー
 - **python-dotenv**: 環境変数管理
 
@@ -486,8 +464,6 @@ pyright
   - Google Cloud プロジェクト ID と認証情報が正しいか確認
   - `GEMINI_EVALUATION_MODEL`環境変数が設定されているか確認
   - Vertex AIが有効化されているか確認
-- **Cloudflare設定を使用する場合**:
-  - `CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_GATEWAY_ID`、`CLOUDFLARE_AIG_TOKEN`が全て設定されているか確認
 
 ### テスト失敗
 - `.env.test`ファイルが正しく設定されているか確認
@@ -538,9 +514,9 @@ pyright
 
 以下の環境変数で制御可能：
 - `CORS_ORIGINS`: 許可するオリジンのリスト
-- `CORS_ALLOW_CREDENTIALS`: クッキー送信の許可
-- `CORS_ALLOW_METHODS`: 許可するHTTPメソッド
-- `CORS_ALLOW_HEADERS`: 許可するヘッダー
+- `CORS_ALLOW_CREDENTIALS`: クッキー送信の許可(オプション)
+- `CORS_ALLOW_METHODS`: 許可するHTTPメソッド(オプション)
+- `CORS_ALLOW_HEADERS`: 許可するヘッダー(オプション)
 
 ### プロンプトインジェクション対策
 
@@ -594,4 +570,3 @@ pyright
 ## 変更履歴
 
 バージョン履歴と更新については、[CHANGELOG.md](docs/CHANGELOG.md)を参照してください。
-"# MediDocsSummary" 
