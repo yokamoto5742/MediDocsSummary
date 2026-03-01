@@ -29,6 +29,7 @@ dependencies = [
     "python-dotenv==1.0.1",
     "PyYAML==6.0.3",
     "tenacity==9.1.2",
+    "tzdata>=2025.3", # Windowsでも動くように明示的にインストール
 ]
 
 [project.optional-dependencies]

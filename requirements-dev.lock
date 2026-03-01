@@ -1519,6 +1519,10 @@ typing-inspection==0.4.2 \
     --hash=sha256:4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7 \
     --hash=sha256:ba561c48a67c5958007083d386c3295464928b01faa735ab8547c5692e87f464
     # via pydantic
+tzdata==2025.3 \
+    --hash=sha256:06a47e5700f3081aab02b2e513160914ff0694bce9947d6b76ebd6bf57cfc5d1 \
+    --hash=sha256:de39c2ca5dc7b0344f2eba86f49d614019d29f060fc4ebc8a417896a620b56a7
+    # via medidocs-summary (pyproject.toml)
 uritemplate==4.2.0 \
     --hash=sha256:480c2ed180878955863323eea31b0ede668795de182617fef9c6ca09e6ec9d0e \
     --hash=sha256:962201ba1c4edcab02e60f9a0d3821e82dfc5d2d6662a21abd533879bdb8a686
