@@ -7,7 +7,7 @@ from app.external.api_factory import generate_summary_with_provider, generate_su
 from app.schemas.summary import SummaryResponse
 from app.services.model_selector import determine_model, get_provider_and_model
 from app.services.sse_helpers import sse_event, stream_with_heartbeat
-from app.services.usage_service import save_usage
+from app.services.usage_service import check_daily_limit, save_usage
 from app.utils.audit_logger import log_audit_event
 from app.utils.input_sanitizer import sanitize_medical_text, validate_medical_input
 from app.utils.text_processor import format_output_summary, parse_output_summary
@@ -73,6 +73,11 @@ def execute_summary_generation(
         department=department,
         doctor=doctor,
     )
+
+    # 日次利用制限チェック
+    limit_error = check_daily_limit()
+    if limit_error:
+        return _error_response(limit_error, model)
 
     # サニタイゼーション適用
     medical_text = sanitize_medical_text(medical_text)
@@ -235,6 +240,12 @@ async def execute_summary_generation_stream(
         department=department,
         doctor=doctor,
     )
+
+    # 日次利用制限チェック
+    limit_error = check_daily_limit()
+    if limit_error:
+        yield sse_event("error", {"success": False, "error_message": limit_error})
+        return
 
     # サニタイゼーション適用
     medical_text = sanitize_medical_text(medical_text)

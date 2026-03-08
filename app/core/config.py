@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     app_type: str = "default"
     selected_ai_model: str = ModelType.CLAUDE.value
 
+    # 日次利用制限
+    daily_request_limit: int = 100
+    daily_input_token_limit: int = 2000000
+    daily_output_token_limit: int = 100000
+
     # CSRF認証
     csrf_secret_key: str = "default-csrf-secret-key"
     csrf_token_expire_minutes: int = 60

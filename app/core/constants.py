@@ -39,6 +39,9 @@ SECTION_DETECTION_PATTERNS = [
 MESSAGES: dict[str, dict[str, str]] = {
     "ERROR": {
         "API_ERROR": "API エラーが発生しました",
+        "DAILY_INPUT_TOKEN_LIMIT_EXCEEDED": "本日の入力トークン制限（{limit}トークン）を超過しました。明日再度お試しください",
+        "DAILY_OUTPUT_TOKEN_LIMIT_EXCEEDED": "本日の出力トークン制限（{limit}トークン）を超過しました。明日再度お試しください",
+        "DAILY_REQUEST_LIMIT_EXCEEDED": "本日のリクエスト回数制限（{limit}回）を超過しました。明日再度お試しください",
         "BEDROCK_API_ERROR": "Amazon Bedrock Claude API呼び出しエラー: {error}",
         "BEDROCK_INIT_ERROR": "Amazon Bedrock Claude API初期化エラー: {error}",
         "CLAUDE_CLIENT_NOT_INITIALIZED": "Claude API クライアントが初期化されていません",
