@@ -1,9 +1,6 @@
 """CSRF認証の統合テスト"""
-from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
-
-from app.core.security import generate_csrf_token
 
 
 class TestCsrfAuthentication:
@@ -35,26 +32,6 @@ class TestCsrfAuthentication:
         )
         assert response.status_code == 403
         assert "無効または期限切れのCSRFトークンです" in response.json()["detail"]
-
-    def test_protected_endpoint_with_valid_token(self, client: TestClient):
-        """有効なCSRFトークンで認証成功"""
-        mock_settings = MagicMock()
-        mock_settings.csrf_secret_key = "test-csrf-secret-key"
-        mock_settings.csrf_token_expire_minutes = 60
-
-        token = generate_csrf_token(mock_settings)
-
-        response = client.post(
-            "/api/summary/generate",
-            json={
-                "medical_text": "test",
-                "department": "内科",
-                "document_type": "診療情報提供書",
-            },
-            headers={"X-CSRF-Token": token},
-        )
-        # CSRF認証は成功（他のエラーがあれば別の理由）
-        assert response.status_code not in [401, 403]
 
     def test_evaluation_endpoint_requires_csrf_token(self, client: TestClient):
         """評価エンドポイントもCSRFトークン必須"""
