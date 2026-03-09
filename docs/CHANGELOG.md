@@ -7,6 +7,28 @@
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-03-09
+
+### 追加
+
+- **日次利用制限機能**: ユーザーごとの日次 API 利用回数に上限を設定する機能を実装
+- **テストカバレッジ拡充**: CSRF トークンの期限切れ・無効・欠落ケースのテスト、セキュリティヘッダーテストを追加
+- **評価プロンプトテスト強化**: セクション順序・複数行コンテンツの検証テストを実装
+- **バリデーション・エラーハンドリングテスト**: `_validate_and_get_prompt` の各種エラー条件テスト、サマリサービスの入力検証テスト（最小文字数・プロンプトインジェクション検出）を追加
+- **モデルセレクタテスト**: DB 障害時フォールバックテスト、Claude/Gemini モデル設定不足時のテストを実装
+
+### 変更
+
+- **UI テンプレート**: 成功ボタンの表示条件を改善し、条件付き表示に対応
+
+### 削除
+
+- **不要なテストコード**: `execute_evaluation`、`execute_evaluation_stream`、`execute_summary_generation` の不要なテストを削除
+
+### 修正
+
+- **依存関係**: grpcio を 1.78.0 に更新
+
 ## [1.0.0] - 2026-03-01
 
 ### 追加
@@ -39,5 +61,6 @@
 - **README ドキュメント**: 不要な設定項目を削除し、ドキュメント品質を改善
 - **依存関係**: requirements.txt を更新し、最新のライブラリバージョンに対応
 
-[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/yourusername/MediDocsSummary/releases/tag/v1.0.0

@@ -8,6 +8,7 @@
 - **複数のAIプロバイダーサポート**: Claude（AWS Bedrock経由）とGemini（Vertex AI経由）に統合
 - **自動モデル切り替え**: 入力文字数が指定の閾値を超えた場合、Claudeから自動的にGeminiに切り替え
 - **構造化文書生成**: 標準化されたセクションで医療文書を生成
+- **日次利用制限**: ユーザーごとの1日あたりのAPI利用回数を制限
 
 ### 文書管理
 - **複数の文書タイプ**: 他院への紹介、逆紹介、返書、最終返書
@@ -50,7 +51,7 @@
 ### 1. リポジトリのクローン
 ```bash
 git clone <repository-url>
-cd MediDocsReferral
+cd MediDocsSummary
 ```
 
 ### 2. 仮想環境の作成と有効化
@@ -366,7 +367,7 @@ python -m pytest tests/services/test_summary_service.py::test_generate_summary -
 
 ### テスト構造
 
-本プロジェクトは367個以上のテストで包括的なテストカバレッジを維持：
+本プロジェクトは337個以上のテストで包括的なテストカバレッジを維持：
 
 - **API統合テスト**: エンドポイントとリクエスト/レスポンス
 - **ビジネスロジック**: サービスレイヤーのユニットテスト
@@ -565,7 +566,7 @@ pyright
 
 ## ライセンス
 
-このプロジェクトは[Apache License 2.0](LICENSE)のもとで公開されています。
+このプロジェクトは[Apache License 2.0](docs/LICENSE)のもとで公開されています。
 
 ## 変更履歴
 
