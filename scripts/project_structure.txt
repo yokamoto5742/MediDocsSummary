@@ -1,7 +1,7 @@
 ============================================================
 プロジェクト構造: MediDocsSummary
 パス: C:\Users\yokam\PycharmProjects\MediDocsSummary
-生成日時: 2026-02-24 18:49:18
+生成日時: 2026-03-11 19:39:51
 ============================================================
 
 └── MediDocsSummary
@@ -25,7 +25,6 @@
     │   │   ├── api_factory.py
     │   │   ├── base_api.py
     │   │   ├── claude_api.py
-    │   │   ├── cloudflare_gemini_api.py
     │   │   └── gemini_api.py
     │   ├── models
     │   │   ├── __init__.py
@@ -79,11 +78,8 @@
     │   ├── __init__.py
     │   └── main.py
     ├── docs
-    │   ├── LICENSE
-    │   └── MediDocsReferral_setup.md
-    ├── ecs
-    │   ├── iam-policies.json
-    │   └── task-definition.json
+    │   ├── CHANGELOG.md
+    │   └── LICENSE
     ├── frontend
     │   ├── src
     │   │   ├── styles
@@ -101,10 +97,10 @@
     ├── Dockerfile
     ├── pyproject.toml
     ├── .dockerignore
-    ├── .python-version
     ├── CLAUDE.md
     ├── package.json
     ├── pyrightconfig.json
     ├── README.md
     ├── requirements-dev.lock
-    └── requirements.lock
+    ├── requirements.lock
+    └── uv.lock
