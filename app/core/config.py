@@ -1,5 +1,4 @@
 import logging
-import os
 from functools import lru_cache
 from urllib.parse import quote_plus
 
@@ -8,8 +7,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.constants import ModelType
 
 logger = logging.getLogger(__name__)
-
-_SECRET_NAME = os.getenv("AWS_SECRET_NAME", "medidocs/production")
 
 
 class Settings(BaseSettings):
@@ -48,16 +45,16 @@ class Settings(BaseSettings):
     gemini_evaluation_model: str | None = None
 
     # Application
-    max_input_tokens: int = 200000
+    max_input_tokens: int = 300000
     min_input_tokens: int = 100
-    max_token_threshold: int = 100000
+    max_token_threshold: int = 150000
     prompt_management: bool = True
     app_type: str = "default"
     selected_ai_model: str = ModelType.CLAUDE.value
 
     # 日次利用制限
     daily_request_limit: int = 100
-    daily_input_token_limit: int = 2000000
+    daily_input_token_limit: int = 5000000
     daily_output_token_limit: int = 100000
 
     # CSRF認証
