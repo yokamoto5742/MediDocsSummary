@@ -54,10 +54,6 @@ def detect_prompt_injection(text: str) -> Tuple[bool, list[str]]:
     if repeated_pattern:
         matched_patterns.append("repeated_pattern_detected")
 
-    # 異常な長さの検出（100KB以上）
-    if len(text) > 100000:
-        matched_patterns.append("excessive_length")
-
     return len(matched_patterns) > 0, matched_patterns
 
 
@@ -93,7 +89,7 @@ def sanitize_prompt_text(text: str) -> str:
     return sanitize_medical_text(text)
 
 
-def validate_medical_input(text: str, max_length: int = 100000) -> Tuple[bool, str | None]:
+def validate_medical_input(text: str, max_length: int) -> Tuple[bool, str | None]:
     """
     医療テキスト入力の検証
 
@@ -105,6 +101,7 @@ def validate_medical_input(text: str, max_length: int = 100000) -> Tuple[bool, s
     if not text:
         return False, "入力テキストが空です"
 
+    # evaluation_service.pyの入力制限で使用
     if len(text) > max_length:
         return False, f"入力テキストが長すぎます（最大{max_length}文字）"
 
