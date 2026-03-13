@@ -89,22 +89,15 @@ def sanitize_prompt_text(text: str) -> str:
     return sanitize_medical_text(text)
 
 
-def validate_medical_input(text: str, max_length: int) -> Tuple[bool, str | None]:
+def validate_medical_input(text: str) -> Tuple[bool, str | None]:
     """
     医療テキスト入力の検証
 
-    プロンプトインジェクション攻撃や異常な入力を検出
+    プロンプトインジェクション攻撃を検出
 
     Returns:
         (is_valid, error_message): 有効な場合True、エラーメッセージ
     """
-    if not text:
-        return False, "入力テキストが空です"
-
-    # evaluation_service.pyの入力制限で使用
-    if len(text) > max_length:
-        return False, f"入力テキストが長すぎます（最大{max_length}文字）"
-
     is_suspicious, _ = detect_prompt_injection(text)
     if is_suspicious:
         return False, "入力テキストに不正なパターンが検出されました"
