@@ -93,19 +93,16 @@ def execute_evaluation(
     user_ip: str | None = None,
 ) -> EvaluationResponse:
     """出力評価を実行"""
-    # 監査ログ: 開始
     log_audit_event(
         event_type=get_message("AUDIT", "EVALUATION_START"),
         user_ip=user_ip,
         document_type=document_type,
     )
 
-    # 日次利用制限チェック
     limit_error = check_daily_limit()
     if limit_error:
         return _error_response(limit_error)
 
-    # サニタイゼーション適用
     input_text = sanitize_medical_text(input_text)
     current_prescription = sanitize_medical_text(current_prescription or "")
     additional_info = sanitize_medical_text(additional_info or "")
@@ -220,20 +217,17 @@ async def execute_evaluation_stream(
     user_ip: str | None = None,
 ) -> AsyncGenerator[str, None]:
     """SSEストリーミングで評価を実行"""
-    # 監査ログ: 開始
     log_audit_event(
         event_type=get_message("AUDIT", "EVALUATION_START"),
         user_ip=user_ip,
         document_type=document_type,
     )
 
-    # 日次利用制限チェック
     limit_error = check_daily_limit()
     if limit_error:
         yield sse_event("error", {"success": False, "error_message": limit_error})
         return
 
-    # サニタイゼーション適用
     input_text = sanitize_medical_text(input_text)
     current_prescription = sanitize_medical_text(current_prescription or "")
     additional_info = sanitize_medical_text(additional_info or "")

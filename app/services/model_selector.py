@@ -27,7 +27,6 @@ def determine_model(
             # プロンプト取得に失敗しても処理を続行
             pass
 
-    # 入力長による自動切替
     if input_length > settings.max_token_threshold and requested_model == ModelType.CLAUDE:
         if settings.gemini_model:
             return ModelType.GEMINI_PRO, True

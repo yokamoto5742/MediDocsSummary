@@ -44,7 +44,6 @@ def validate_input(medical_text: str) -> tuple[bool, str | None]:
     if input_length > settings.max_input_tokens:
         return False, MESSAGES["VALIDATION"]["INPUT_TOO_LONG"]
 
-    # プロンプトインジェクション検出
     is_valid, error_msg = validate_medical_input(medical_text, settings.max_input_tokens)
     if not is_valid:
         return False, error_msg
@@ -64,7 +63,6 @@ def execute_summary_generation(
     user_ip: str | None = None,
 ) -> SummaryResponse:
     """文書生成を実行"""
-    # 監査ログ: 開始
     log_audit_event(
         event_type=get_message("AUDIT", "DOCUMENT_GENERATION_START"),
         user_ip=user_ip,
@@ -74,17 +72,14 @@ def execute_summary_generation(
         doctor=doctor,
     )
 
-    # 日次利用制限チェック
     limit_error = check_daily_limit()
     if limit_error:
         return _error_response(limit_error, model)
 
-    # サニタイゼーション適用
     medical_text = sanitize_medical_text(medical_text)
     additional_info = sanitize_medical_text(additional_info or "")
     current_prescription = sanitize_medical_text(current_prescription or "")
 
-    # 入力検証
     is_valid, error_msg = validate_input(medical_text)
     if not is_valid:
         log_audit_event(
@@ -97,7 +92,6 @@ def execute_summary_generation(
         )
         return _error_response(error_msg or MESSAGES["ERROR"]["INPUT_ERROR"], model)
 
-    # モデル決定
     total_length = len(medical_text) + len(additional_info or "")
     try:
         final_model, model_switched = determine_model(
@@ -241,18 +235,15 @@ async def execute_summary_generation_stream(
         doctor=doctor,
     )
 
-    # 日次利用制限チェック
     limit_error = check_daily_limit()
     if limit_error:
         yield sse_event("error", {"success": False, "error_message": limit_error})
         return
 
-    # サニタイゼーション適用
     medical_text = sanitize_medical_text(medical_text)
     additional_info = sanitize_medical_text(additional_info or "")
     current_prescription = sanitize_medical_text(current_prescription or "")
 
-    # 入力検証
     is_valid, error_msg = validate_input(medical_text)
     if not is_valid:
         log_audit_event(
@@ -269,7 +260,6 @@ async def execute_summary_generation_stream(
         })
         return
 
-    # モデル決定
     total_length = len(medical_text) + len(additional_info or "")
     try:
         final_model, model_switched = determine_model(
@@ -288,7 +278,6 @@ async def execute_summary_generation_stream(
         yield sse_event("error", {"success": False, "error_message": str(e)})
         return
 
-    # プロバイダーとモデル名を取得
     try:
         provider, model_name = get_provider_and_model(final_model)
     except ValueError as e:
@@ -331,7 +320,6 @@ async def execute_summary_generation_stream(
                 output_tokens=output_tokens, processing_time=processing_time,
             )
 
-            # 監査ログ: 成功
             log_audit_event(
                 event_type=get_message("AUDIT", "DOCUMENT_GENERATION_SUCCESS"),
                 user_ip=user_ip,
