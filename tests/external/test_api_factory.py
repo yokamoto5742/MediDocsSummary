@@ -225,3 +225,60 @@ class TestEdgeCases:
         # generate_summary(medical_text, additional_info, current_prescription, department, document_type, doctor, model_name)
         call_args = mock_generate.call_args[0]
         assert call_args[6] is None  # model_name
+
+
+class TestGenerateSummaryStreamWithProvider:
+    """generate_summary_stream_with_provider 関数のテスト"""
+
+    @patch.object(ClaudeAPIClient, "generate_summary_stream")
+    @patch.object(ClaudeAPIClient, "initialize")
+    def test_stream_with_claude(self, mock_init, mock_stream):
+        """Claude プロバイダーでストリームジェネレータを返す"""
+        from app.external.api_factory import generate_summary_stream_with_provider
+
+        mock_stream.return_value = iter(["チャンク1", "チャンク2"])
+
+        result = generate_summary_stream_with_provider(
+            provider=APIProvider.CLAUDE,
+            medical_text="カルテ情報",
+            additional_info="追加情報",
+            current_prescription="薬剤A",
+        )
+
+        mock_stream.assert_called_once()
+        chunks = list(result)
+        assert chunks == ["チャンク1", "チャンク2"]
+
+    @patch.object(GeminiAPIClient, "generate_summary_stream")
+    @patch.object(GeminiAPIClient, "initialize")
+    def test_stream_with_gemini(self, mock_init, mock_stream):
+        """Gemini プロバイダーでストリームジェネレータを返す"""
+        from app.external.api_factory import generate_summary_stream_with_provider
+
+        mock_stream.return_value = iter(["チャンクA", "チャンクB"])
+
+        result = generate_summary_stream_with_provider(
+            provider=APIProvider.GEMINI,
+            medical_text="カルテ情報",
+        )
+
+        mock_stream.assert_called_once()
+        chunks = list(result)
+        assert chunks == ["チャンクA", "チャンクB"]
+
+    @patch.object(ClaudeAPIClient, "generate_summary_stream")
+    @patch.object(ClaudeAPIClient, "initialize")
+    def test_stream_passes_model_name(self, mock_init, mock_stream):
+        """model_name がクライアントに渡される"""
+        from app.external.api_factory import generate_summary_stream_with_provider
+
+        mock_stream.return_value = iter([])
+
+        generate_summary_stream_with_provider(
+            provider="claude",
+            medical_text="テキスト",
+            model_name="claude-3-5-sonnet",
+        )
+
+        call_args = mock_stream.call_args[0]
+        assert "claude-3-5-sonnet" in call_args

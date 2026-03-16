@@ -138,3 +138,205 @@ class TestValidateAndGetPrompt:
 
         assert error is None
         assert prompt == "評価プロンプトのテキスト"
+
+
+class TestExecuteEvaluation:
+    """execute_evaluation 統合フローのテスト"""
+
+    def _success_patches(self):
+        mock_prompt = MagicMock()
+        mock_prompt.content = "評価プロンプト"
+        mock_client = MagicMock()
+        mock_client._generate_content.return_value = ("評価結果テキスト", 200, 80)
+        return {
+            "log_audit_event": patch("app.services.evaluation_service.log_audit_event"),
+            "check_daily_limit": patch("app.services.evaluation_service.check_daily_limit", return_value=None),
+            "sanitize": patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x),
+            "validate_and_get": patch(
+                "app.services.evaluation_service._validate_and_get_prompt",
+                return_value=("評価プロンプト", None),
+            ),
+            "gemini_client": patch("app.services.evaluation_service.GeminiAPIClient", return_value=mock_client),
+        }
+
+    def test_success(self):
+        """正常系: EvaluationResponse が success=True で返る"""
+        from app.services.evaluation_service import execute_evaluation
+
+        patches = self._success_patches()
+        with patches["log_audit_event"], patches["check_daily_limit"], \
+             patches["sanitize"], patches["validate_and_get"], patches["gemini_client"]:
+            result = execute_evaluation(
+                document_type="退院時サマリ",
+                input_text="カルテ情報" * 10,
+                current_prescription="薬剤A",
+                additional_info="追加情報",
+                output_summary="サマリ出力内容",
+            )
+
+        assert result.success is True
+        assert result.evaluation_result == "評価結果テキスト"
+        assert result.input_tokens == 200
+        assert result.output_tokens == 80
+
+    def test_daily_limit_error(self):
+        """日次制限超過: success=False でエラーメッセージが返る"""
+        from app.services.evaluation_service import execute_evaluation
+
+        with patch("app.services.evaluation_service.log_audit_event"), \
+             patch("app.services.evaluation_service.check_daily_limit", return_value="日次制限エラー"):
+            result = execute_evaluation(
+                document_type="退院時サマリ",
+                input_text="テキスト",
+                current_prescription="",
+                additional_info="",
+                output_summary="サマリ",
+            )
+
+        assert result.success is False
+        assert result.error_message == "日次制限エラー"
+
+    def test_validate_and_get_prompt_error(self):
+        """プロンプト検証失敗: success=False でエラーメッセージが返る"""
+        from app.services.evaluation_service import execute_evaluation
+
+        with patch("app.services.evaluation_service.log_audit_event"), \
+             patch("app.services.evaluation_service.check_daily_limit", return_value=None), \
+             patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x), \
+             patch("app.services.evaluation_service._validate_and_get_prompt", return_value=(None, "プロンプト未登録")):
+            result = execute_evaluation(
+                document_type="退院時サマリ",
+                input_text="カルテ情報" * 10,
+                current_prescription="",
+                additional_info="",
+                output_summary="サマリ",
+            )
+
+        assert result.success is False
+        assert result.error_message == "プロンプト未登録"
+
+    def test_api_error_returns_error_response(self):
+        """APIError 例外: success=False で返る"""
+        from app.utils.exceptions import APIError
+        from app.services.evaluation_service import execute_evaluation
+
+        mock_client = MagicMock()
+        mock_client._generate_content.side_effect = APIError("Gemini APIエラー")
+
+        with patch("app.services.evaluation_service.log_audit_event"), \
+             patch("app.services.evaluation_service.check_daily_limit", return_value=None), \
+             patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x), \
+             patch("app.services.evaluation_service._validate_and_get_prompt", return_value=("評価プロンプト", None)), \
+             patch("app.services.evaluation_service.GeminiAPIClient", return_value=mock_client):
+            result = execute_evaluation(
+                document_type="退院時サマリ",
+                input_text="カルテ情報" * 10,
+                current_prescription="",
+                additional_info="",
+                output_summary="サマリ",
+            )
+
+        assert result.success is False
+        assert "Gemini APIエラー" in result.error_message
+
+    def test_generic_exception_returns_error_response(self):
+        """一般例外: success=False で返る"""
+        from app.services.evaluation_service import execute_evaluation
+
+        mock_client = MagicMock()
+        mock_client._generate_content.side_effect = Exception("予期せぬエラー")
+
+        with patch("app.services.evaluation_service.log_audit_event"), \
+             patch("app.services.evaluation_service.check_daily_limit", return_value=None), \
+             patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x), \
+             patch("app.services.evaluation_service._validate_and_get_prompt", return_value=("評価プロンプト", None)), \
+             patch("app.services.evaluation_service.GeminiAPIClient", return_value=mock_client):
+            result = execute_evaluation(
+                document_type="退院時サマリ",
+                input_text="カルテ情報" * 10,
+                current_prescription="",
+                additional_info="",
+                output_summary="サマリ",
+            )
+
+        assert result.success is False
+        assert result.error_message is not None
+
+
+class TestExecuteEvaluationStream:
+    """execute_evaluation_stream SSEフローのテスト"""
+
+    async def _collect(self, gen):
+        results = []
+        async for item in gen:
+            results.append(item)
+        return results
+
+    async def test_daily_limit_error_yields_sse_error(self):
+        """日次制限超過: SSE error イベントを yield して終了"""
+        import json
+        from app.services.evaluation_service import execute_evaluation_stream
+
+        with patch("app.services.evaluation_service.log_audit_event"), \
+             patch("app.services.evaluation_service.check_daily_limit", return_value="日次制限エラー"):
+            events = await self._collect(execute_evaluation_stream(
+                document_type="退院時サマリ",
+                input_text="テキスト",
+                current_prescription="",
+                additional_info="",
+                output_summary="サマリ",
+            ))
+
+        assert len(events) == 1
+        assert "event: error" in events[0]
+        data_line = [l for l in events[0].splitlines() if l.startswith("data:")][0]
+        payload = json.loads(data_line[len("data:"):].strip())
+        assert payload["success"] is False
+
+    async def test_validate_prompt_error_yields_sse_error(self):
+        """プロンプト検証失敗: SSE error イベントを yield して終了"""
+        from app.services.evaluation_service import execute_evaluation_stream
+
+        with patch("app.services.evaluation_service.log_audit_event"), \
+             patch("app.services.evaluation_service.check_daily_limit", return_value=None), \
+             patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x), \
+             patch("app.services.evaluation_service._validate_and_get_prompt", return_value=(None, "プロンプト未登録")):
+            events = await self._collect(execute_evaluation_stream(
+                document_type="退院時サマリ",
+                input_text="テキスト",
+                current_prescription="",
+                additional_info="",
+                output_summary="サマリ",
+            ))
+
+        assert len(events) == 1
+        assert "event: error" in events[0]
+
+    async def test_success_yields_complete_event(self):
+        """正常系: SSE complete イベントが yield される"""
+        import json
+
+        async def mock_stream_with_heartbeat(**kwargs):
+            yield ("評価結果", 200, 80)
+
+        from app.services.evaluation_service import execute_evaluation_stream
+
+        with patch("app.services.evaluation_service.log_audit_event"), \
+             patch("app.services.evaluation_service.check_daily_limit", return_value=None), \
+             patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x), \
+             patch("app.services.evaluation_service._validate_and_get_prompt", return_value=("評価プロンプト", None)), \
+             patch("app.services.evaluation_service.stream_with_heartbeat", mock_stream_with_heartbeat):
+            events = await self._collect(execute_evaluation_stream(
+                document_type="退院時サマリ",
+                input_text="カルテ情報" * 10,
+                current_prescription="",
+                additional_info="",
+                output_summary="サマリ内容",
+            ))
+
+        complete_events = [e for e in events if "event: complete" in e]
+        assert len(complete_events) == 1
+        data_line = [l for l in complete_events[0].splitlines() if l.startswith("data:")][0]
+        payload = json.loads(data_line[len("data:"):].strip())
+        assert payload["success"] is True
+        assert payload["evaluation_result"] == "評価結果"
