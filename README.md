@@ -81,7 +81,7 @@ createdb medidocs
 
 環境変数は以下の優先順位で読み込まれます：
 1. OS環境変数（既存の値は上書きされない）
-2. AWS Secrets Manager（`AWS_SECRET_NAME`で指定、デフォルト: `medidocs/prod`）
+2. AWS Secrets Manager
 3. `.env`ファイル
 
 ## 環境変数の設定

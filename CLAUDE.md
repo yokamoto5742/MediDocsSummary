@@ -21,8 +21,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 命名：説明的な名前を使用してください。`tmp` 、`data`、`handleStuff`のような一般的な名前は避けてください。例えば、`doCalc`よりも`calculateInvoiceTotal` の方が適しています。
 - DRY原則：コードを重複させないでください。類似のロジックが2箇所に存在する場合は、共有関数にリファクタリングしてください。それぞれに独自の実装が必要な場合はその理由を明確にしてください。
 - コメント:分かりにくいロジックについては説明を加えます。説明不要のコードには過剰なコメントはつけないでください。
-- コメントとdocstringは必要最小限に日本語で記述します。文末に"。"や"."をつけないでください。
-- このアプリのUI画面で表示するメッセージはすべて日本語にします。app/core/constants.pyで一元管理します。
+- コメントとdocstringは必要最小限に日本語で記述します。
+- このアプリのUI画面で表示するメッセージはすべて日本語にします。constants.pyで一元管理します。
 
 ## 概要
 
@@ -85,7 +85,7 @@ Model層 (app/models/)  → SQLAlchemy ORM
 
 - `app/external/api_factory.py` の `create_client(APIProvider)` でクライアントを動的生成
 - `ClaudeAPIClient`（AWS Bedrock）と `GeminiAPIClient`（Vertex AI）は `BaseAPIClient` を継承
-- `app/services/model_selector.py` で入力文字数が `MAX_TOKEN_THRESHOLD`（デフォルト100,000文字）を超えた場合、Claude → Gemini に自動切り替え
+- `app/services/model_selector.py` で入力文字数が `MAX_TOKEN_THRESHOLD` を超えた場合、Claude → Gemini に自動切り替え
 
 ### 階層的プロンプト解決
 
@@ -99,7 +99,7 @@ Model層 (app/models/)  → SQLAlchemy ORM
 
 - `app/core/config.py` の `Settings`（pydantic-settings）が `.env` ファイルを読み込み
 - `get_settings()` は `@lru_cache` でシングルトン
-- 優先順位: OS環境変数 → AWS Secrets Manager（`AWS_SECRET_NAME` で指定）→ `.env`
+- 優先順位: OS環境変数 → AWS Secrets Manager → `.env`
 
 ### 定数管理
 
@@ -127,7 +127,7 @@ Model層 (app/models/)  → SQLAlchemy ORM
 ## コーディング規約
 
 - 型ヒント必須（パラメータと戻り値）
-- コメントは複雑なロジックのみ日本語で記述（文末に句点不要）
+- コメントは複雑なロジックのみ日本語で記述
 - 関数は50行以下を目標
 - インポート順: 標準ライブラリ → サードパーティ → ローカル（各グループ内アルファベット順、`import` 先・`from` 後）
 
