@@ -148,6 +148,8 @@ class TestExecuteEvaluation:
         mock_prompt.content = "評価プロンプト"
         mock_client = MagicMock()
         mock_client._generate_content.return_value = ("評価結果テキスト", 200, 80)
+        mock_settings = MagicMock()
+        mock_settings.gemini_evaluation_model = "gemini-1.5-pro"
         return {
             "log_audit_event": patch("app.services.evaluation_service.log_audit_event"),
             "check_daily_limit": patch("app.services.evaluation_service.check_daily_limit", return_value=None),
@@ -156,6 +158,7 @@ class TestExecuteEvaluation:
                 "app.services.evaluation_service._validate_and_get_prompt",
                 return_value=("評価プロンプト", None),
             ),
+            "settings": patch("app.services.evaluation_service.settings", mock_settings),
             "gemini_client": patch("app.services.evaluation_service.GeminiAPIClient", return_value=mock_client),
         }
 
@@ -165,7 +168,8 @@ class TestExecuteEvaluation:
 
         patches = self._success_patches()
         with patches["log_audit_event"], patches["check_daily_limit"], \
-             patches["sanitize"], patches["validate_and_get"], patches["gemini_client"]:
+             patches["sanitize"], patches["validate_and_get"], \
+             patches["settings"], patches["gemini_client"]:
             result = execute_evaluation(
                 document_type="退院時サマリ",
                 input_text="カルテ情報" * 10,
@@ -222,11 +226,14 @@ class TestExecuteEvaluation:
 
         mock_client = MagicMock()
         mock_client._generate_content.side_effect = APIError("Gemini APIエラー")
+        mock_settings = MagicMock()
+        mock_settings.gemini_evaluation_model = "gemini-1.5-pro"
 
         with patch("app.services.evaluation_service.log_audit_event"), \
              patch("app.services.evaluation_service.check_daily_limit", return_value=None), \
              patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x), \
              patch("app.services.evaluation_service._validate_and_get_prompt", return_value=("評価プロンプト", None)), \
+             patch("app.services.evaluation_service.settings", mock_settings), \
              patch("app.services.evaluation_service.GeminiAPIClient", return_value=mock_client):
             result = execute_evaluation(
                 document_type="退院時サマリ",
@@ -245,11 +252,14 @@ class TestExecuteEvaluation:
 
         mock_client = MagicMock()
         mock_client._generate_content.side_effect = Exception("予期せぬエラー")
+        mock_settings = MagicMock()
+        mock_settings.gemini_evaluation_model = "gemini-1.5-pro"
 
         with patch("app.services.evaluation_service.log_audit_event"), \
              patch("app.services.evaluation_service.check_daily_limit", return_value=None), \
              patch("app.services.evaluation_service.sanitize_medical_text", side_effect=lambda x: x), \
              patch("app.services.evaluation_service._validate_and_get_prompt", return_value=("評価プロンプト", None)), \
+             patch("app.services.evaluation_service.settings", mock_settings), \
              patch("app.services.evaluation_service.GeminiAPIClient", return_value=mock_client):
             result = execute_evaluation(
                 document_type="退院時サマリ",
