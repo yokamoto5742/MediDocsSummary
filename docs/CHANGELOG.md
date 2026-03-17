@@ -7,6 +7,22 @@
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-03-17
+
+### 追加
+
+- **テスト構造生成スクリプト**: テスト構造を自動生成・保存するスクリプトを実装
+
+### 変更
+
+- **環境ファイル管理**: `.env` ファイル名とAWS Secrets Manager のシークレット名を統一
+- **Docker設定**: Node.jsイメージをv22に更新、uvをlatestバージョンに設定
+
+### その他
+
+- **.gitignore整備**: ロックファイル（`*.lock`）、ビルド成果物、依存関係ファイルをignoreファイルに追加
+- **.dockerignore更新**: Dockerfile ビルドの効率化のため、不要なファイルをdockerignoreに追加
+
 ## [1.0.1] - 2026-03-09
 
 ### 追加
@@ -61,6 +77,7 @@
 - **README ドキュメント**: 不要な設定項目を削除し、ドキュメント品質を改善
 - **依存関係**: requirements.txt を更新し、最新のライブラリバージョンに対応
 
-[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/yourusername/MediDocsSummary/releases/tag/v1.0.0
