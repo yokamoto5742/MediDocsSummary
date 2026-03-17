@@ -6,7 +6,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 DEFAULT_ENV_FILE = ".env"
-DEFAULT_SECRET_NAME = "medidocs/prod"
+DEFAULT_SECRET_NAME = "medidocs/production"
 DEFAULT_REGION = "ap-northeast-1"
 
 

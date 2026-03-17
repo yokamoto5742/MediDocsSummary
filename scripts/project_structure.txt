@@ -1,7 +1,7 @@
 ============================================================
 プロジェクト構造: MediDocsSummary
 パス: C:\Users\yokam\PycharmProjects\MediDocsSummary
-生成日時: 2026-03-16 11:30:22
+生成日時: 2026-03-17 15:31:52
 ============================================================
 
 └── MediDocsSummary
@@ -79,9 +79,9 @@
     │   └── main.py
     ├── docs
     │   ├── CHANGELOG.md
+    │   ├── iam-policies.json
     │   └── LICENSE
     ├── ecs
-    │   ├── iam-policies.json
     │   └── task-definition.json
     ├── frontend
     │   ├── src
@@ -103,7 +103,4 @@
     ├── CLAUDE.md
     ├── package.json
     ├── pyrightconfig.json
-    ├── README.md
-    ├── requirements-dev.lock
-    ├── requirements.lock
-    └── uv.lock
+    └── README.md

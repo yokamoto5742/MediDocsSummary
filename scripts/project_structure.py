@@ -12,7 +12,7 @@ class ProjectStructureGenerator:
             '.venv', 'venv', '.env', 'env', 'tests','nul','logs','assets',
             '.vscode', '.idea', '*.swp', '*.swo', '*~',
             '.git', '.gitignore', '.hg', '.svn',
-            '.DS_Store', 'Thumbs.db', 'desktop.ini','pytest.ini',
+            '.DS_Store', 'Thumbs.db', 'desktop.ini','pytest.ini','*.lock',
             'node_modules', '.npm', 'package-lock.json',
             '*.log', '*.tmp', '.cache', 'CLAUDE.md',
         }

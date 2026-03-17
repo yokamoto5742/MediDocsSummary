@@ -110,13 +110,11 @@ DATABASE_URL=postgresql://user:password@host:port/database
 
 ### Claude API設定(AWS Bedrock)
 ```env
-# ローカル開発環境（アクセスキーを使用する場合）
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+# ローカル開発環境
 AWS_REGION=ap-northeast-1
-ANTHROPIC_MODEL=anthropic.claude-3-5-sonnet-20241022-v2:0
+ANTHROPIC_MODEL=jp.anthropic.claude-sonnet-4-6
 
-# EC2/ECS環境（IAMロール自動検出を使用する場合、上記は不要）
+# EC2/ECS環境（AWS Secrets Manager で管理)
 ```
 
 ### Google Vertex AI設定
@@ -127,8 +125,8 @@ GOOGLE_CREDENTIALS_JSON={"type":"service_account","project_id":"your-project",..
 # Vertex AI設定
 GOOGLE_PROJECT_ID=your-gcp-project-id
 GOOGLE_LOCATION=global
-GEMINI_MODEL=gemini-2.0-flash
-GEMINI_EVALUATION_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_EVALUATION_MODEL=gemini-2.5-flash
 GEMINI_THINKING_LEVEL=HIGH
 ```
 
@@ -458,7 +456,7 @@ pyright
 
 ### AI APIエラー
 - **Claude API エラー**:
-  - AWS Secrets Managerの設定確認（ローカル開発の場合）
+  - AWS Secrets Managerの設定確認
   - IAMロール権限確認（EC2/ECS環境）
   - `ANTHROPIC_MODEL`環境変数の設定確認
 - **Gemini API エラー**:
