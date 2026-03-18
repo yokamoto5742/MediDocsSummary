@@ -282,3 +282,73 @@ class TestGenerateSummaryStreamWithProvider:
 
         call_args = mock_stream.call_args[0]
         assert "claude-3-5-sonnet" in call_args
+
+
+class TestCreateClientErrorScenarios:
+    """create_client エラーシナリオのテスト"""
+
+    def test_create_client_invalid_string_raises_api_error(self):
+        """無効なプロバイダー文字列が APIError を発生させること"""
+        with pytest.raises(APIError) as exc_info:
+            create_client("gpt4")
+
+        assert "gpt4" in str(exc_info.value)
+
+    def test_create_client_empty_string_raises_api_error(self):
+        """空文字列が APIError を発生させること"""
+        with pytest.raises(APIError):
+            create_client("")
+
+    def test_create_client_numeric_string_raises_api_error(self):
+        """数値文字列が APIError を発生させること"""
+        with pytest.raises(APIError):
+            create_client("123")
+
+    def test_create_client_returns_independent_instances(self):
+        """複数回呼び出しで独立したインスタンスを返すこと"""
+        client1 = create_client(APIProvider.CLAUDE)
+        client2 = create_client(APIProvider.CLAUDE)
+        assert client1 is not client2
+
+    def test_create_client_openai_raises_api_error(self):
+        """サポート外プロバイダー 'openai' が APIError を発生させること"""
+        with pytest.raises(APIError) as exc_info:
+            create_client("openai")
+
+        assert "openai" in str(exc_info.value)
+
+
+class TestGenerateSummaryWithProviderErrors:
+    """generate_summary_with_provider エラーシナリオのテスト"""
+
+    def test_generate_with_invalid_provider_raises_api_error(self):
+        """無効なプロバイダーで APIError を発生させること"""
+        with pytest.raises(APIError):
+            generate_summary_with_provider(
+                provider="invalid_provider",
+                medical_text="カルテ情報",
+            )
+
+    @patch.object(ClaudeAPIClient, "initialize")
+    @patch.object(ClaudeAPIClient, "generate_summary")
+    def test_generate_propagates_api_error(self, mock_generate, mock_init):
+        """クライアントから APIError が伝播すること"""
+        mock_generate.side_effect = APIError("API呼び出し失敗")
+
+        with pytest.raises(APIError, match="API呼び出し失敗"):
+            generate_summary_with_provider(
+                provider=APIProvider.CLAUDE,
+                medical_text="カルテ情報",
+            )
+
+    @patch.object(GeminiAPIClient, "initialize")
+    @patch.object(GeminiAPIClient, "generate_summary")
+    def test_generate_gemini_propagates_connection_error(self, mock_generate, mock_init):
+        """Gemini クライアントの接続エラーが伝播すること"""
+        mock_generate.side_effect = APIError("Vertex AI接続エラー")
+
+        with pytest.raises(APIError, match="Vertex AI接続エラー"):
+            generate_summary_with_provider(
+                provider=APIProvider.GEMINI,
+                medical_text="カルテ情報",
+            )

@@ -7,6 +7,24 @@
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-03-18
+
+### 追加
+
+- **統合テストスイート**: エラーハンドリング、評価フロー、プロンプト管理、セキュリティ統合、設定エンドポイント、統計フロー、サマリフローの包括的な統合テストを実装
+- **SSEエラー処理**: Server-Sent Eventsでキューからのエラー処理機能を追加し、ストリーミング応答の堅牢性を向上
+
+### 変更
+
+- **型チェック強化**: Pyright設定を更新し、型検査の厳密性を向上。複数のテストモジュールで型アノテーションを修正
+- **エラーハンドリング改善**: APIレスポンスのボディをデコードする処理を追加し、エラーメッセージの信頼性を向上
+- **DBセッション管理**: conftest.pyのセッション管理ロジックを修正し、テストの安定性を確保
+
+### 修正
+
+- **usage_service**: 未定義のAPI呼び出しでNoneを返すように修正
+- **テストケース修正**: evaluation_service、evaluation_prompt_service、summary_serviceで型アノテーションとNoneチェックを追加し、テスト信頼性を向上
+
 ## [1.0.2] - 2026-03-17
 
 ### 追加
@@ -77,7 +95,8 @@
 - **README ドキュメント**: 不要な設定項目を削除し、ドキュメント品質を改善
 - **依存関係**: requirements.txt を更新し、最新のライブラリバージョンに対応
 
-[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/yourusername/MediDocsSummary/releases/tag/v1.0.0

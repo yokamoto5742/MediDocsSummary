@@ -1,3 +1,4 @@
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -316,28 +317,33 @@ class TestSaveUsage:
 class TestExecuteSummaryGeneration:
     """execute_summary_generation 統合フローのテスト"""
 
-    def _base_patches(self):
-        """共通パッチのリスト"""
-        return [
-            patch("app.services.summary_service.log_audit_event"),
-            patch("app.services.summary_service.check_daily_limit", return_value=None),
-            patch("app.services.summary_service.sanitize_medical_text", side_effect=lambda x: x),
-            patch("app.services.summary_service.validate_input", return_value=(True, None)),
-            patch("app.services.summary_service.determine_model", return_value=("Claude", False)),
-            patch("app.services.summary_service.get_provider_and_model", return_value=("claude", "claude-3-5")),
-            patch("app.services.summary_service.generate_summary_with_provider", return_value=("出力テキスト", 100, 50)),
-            patch("app.services.summary_service.format_output_summary", return_value="整形済み出力"),
-            patch("app.services.summary_service.parse_output_summary", return_value={"section": "内容"}),
-            patch("app.services.summary_service.save_usage"),
-        ]
+    BASE_PATCHES = [
+        ("app.services.summary_service.log_audit_event", {}),
+        ("app.services.summary_service.check_daily_limit", {"return_value": None}),
+        ("app.services.summary_service.sanitize_medical_text", {"side_effect": lambda x: x}),
+        ("app.services.summary_service.validate_input", {"return_value": (True, None)}),
+        ("app.services.summary_service.determine_model", {"return_value": ("Claude", False)}),
+        ("app.services.summary_service.get_provider_and_model", {"return_value": ("claude", "claude-3-5")}),
+        ("app.services.summary_service.generate_summary_with_provider", {"return_value": ("出力テキスト", 100, 50)}),
+        ("app.services.summary_service.format_output_summary", {"return_value": "整形済み出力"}),
+        ("app.services.summary_service.parse_output_summary", {"return_value": {"section": "内容"}}),
+        ("app.services.summary_service.save_usage", {}),
+    ]
+
+    def _apply_base_patches(self, stack: ExitStack):
+        """共通パッチを ExitStack に登録してモック辞書を返す"""
+        mocks = {}
+        for target, kwargs in self.BASE_PATCHES:
+            key = target.rsplit(".", 1)[-1]
+            mocks[key] = stack.enter_context(patch(target, **kwargs))
+        return mocks
 
     def test_success(self):
         """正常系: SummaryResponse が success=True で返る"""
         from app.services.summary_service import execute_summary_generation
 
-        patches = self._base_patches()
-        with patches[0], patches[1], patches[2], patches[3], patches[4], \
-             patches[5], patches[6], patches[7], patches[8], patches[9]:
+        with ExitStack() as stack:
+            self._apply_base_patches(stack)
             result = execute_summary_generation(
                 medical_text="カルテ情報" * 20,
                 additional_info="",
