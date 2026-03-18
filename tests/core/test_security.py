@@ -206,7 +206,7 @@ class TestSecurityHeadersMiddleware:
 
     def test_no_hsts_on_http(self):
         """HTTP アクセス時は HSTS ヘッダーが付かない"""
-        headers = self._make_response(url="http://testserver/")
+        headers = self._make_response()
         assert "strict-transport-security" not in headers
 
     def test_csp_header_present(self):

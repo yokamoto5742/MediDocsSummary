@@ -121,13 +121,7 @@ class TestPromptModel:
 
     def test_selected_model_nullable(self, db):
         """selected_model は NULL 許容"""
-        prompt = Prompt(
-            department="内科",
-            doctor="default",
-            document_type="退院時サマリ",
-            content="内科プロンプト",
-            selected_model=None,
-        )
+        prompt = Prompt(department="内科", doctor="default", document_type="退院時サマリ", content="内科プロンプト")
         db.add(prompt)
         db.flush()
 

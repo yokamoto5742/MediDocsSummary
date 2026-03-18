@@ -87,13 +87,8 @@ class TestSettingsEndpoints:
         self, integration_client, db_session
     ):
         """プロンプトは存在するがselected_model未設定の場合はnullが返される"""
-        db_session.add(Prompt(
-            department="眼科",
-            doctor="default",
-            document_type="退院時サマリ",
-            content="眼科プロンプト（モデル未設定）",
-            selected_model=None,
-        ))
+        db_session.add(Prompt(department="眼科", doctor="default", document_type="退院時サマリ",
+                              content="眼科プロンプト（モデル未設定）"))
         db_session.commit()
 
         response = integration_client.get(

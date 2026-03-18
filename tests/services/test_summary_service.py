@@ -159,14 +159,8 @@ class TestDetermineModel:
         mock_settings.max_token_threshold = 40000
 
         with patch("app.services.model_selector.get_db_session", side_effect=Exception("DB error")):
-            model, switched = determine_model(
-                requested_model="Claude",
-                input_length=10000,
-                department="内科",
-                document_type="退院時サマリ",
-                doctor="default",
-                model_explicitly_selected=False,
-            )
+            model, switched = determine_model(requested_model="Claude", input_length=10000, department="内科",
+                                              document_type="退院時サマリ", doctor="default")
 
         assert model == "Claude"
         assert switched is False
@@ -555,7 +549,7 @@ class TestExecuteSummaryGenerationStream:
         import json
 
         async def mock_stream_with_heartbeat(**kwargs):
-            yield ("出力テキスト", 100, 50)
+            yield "出力テキスト", 100, 50
 
         from app.services.summary_service import execute_summary_generation_stream
 

@@ -327,7 +327,7 @@ class TestExecuteEvaluationStream:
         import json
 
         async def mock_stream_with_heartbeat(**_kwargs):
-            yield ("評価結果", 200, 80)
+            yield "評価結果", 200, 80
 
         from app.services.evaluation_service import execute_evaluation_stream
 

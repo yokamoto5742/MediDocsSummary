@@ -102,7 +102,7 @@ class TestStatisticsFiltering:
     ):
         """日付フィルターで古いレコードが除外される"""
         _add_usage(db_session, "Claude", "内科", days_ago=30, count=2)
-        _add_usage(db_session, "Claude", "内科", days_ago=0, count=1)
+        _add_usage(db_session, "Claude", "内科")
 
         today = datetime.now(JST)
         start = (today - timedelta(days=1)).isoformat()
@@ -134,7 +134,7 @@ class TestStatisticsFiltering:
     ):
         """集計レコードのモデルフィルターが機能する"""
         _add_usage(db_session, "Claude", "内科", count=2)
-        _add_usage(db_session, "Gemini_Pro", "内科", count=1)
+        _add_usage(db_session, "Gemini_Pro", "内科")
 
         res = integration_client.get(
             "/api/statistics/aggregated", params={"model": "Claude"}

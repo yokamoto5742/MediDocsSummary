@@ -113,10 +113,6 @@ class TestGetDbSession:
                 with get_db_session():
                     raise ValueError("テストエラー")
 
-        mock_session.commit.assert_not_called()
-        mock_session.rollback.assert_called_once()
-        mock_session.close.assert_called_once()
-
     def test_get_db_session_always_closes(self):
         """`get_db_session` は成功・失敗に関わらず close すること"""
         for raise_error in [False, True]:

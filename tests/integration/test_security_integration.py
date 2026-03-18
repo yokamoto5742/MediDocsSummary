@@ -183,7 +183,7 @@ class TestXSSProtection:
 
         def capture_generate(**kwargs):
             captured["medical_text"] = kwargs.get("medical_text", "")
-            return ("生成テキスト", 100, 50)
+            return "生成テキスト", 100, 50
 
         with patch(
             "app.services.summary_service.generate_summary_with_provider",
@@ -216,7 +216,7 @@ class TestXSSProtection:
 
         def capture_generate(**kwargs):
             captured["medical_text"] = kwargs.get("medical_text", "")
-            return ("生成テキスト", 100, 50)
+            return "生成テキスト", 100, 50
 
         with patch(
             "app.services.summary_service.generate_summary_with_provider",
