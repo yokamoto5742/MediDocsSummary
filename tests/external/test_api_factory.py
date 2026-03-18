@@ -74,7 +74,7 @@ class TestCreateClient:
     def test_create_client_invalid_provider_type(self):
         """クライアント作成 - 無効なプロバイダータイプ"""
         with pytest.raises(APIError):
-            create_client(123)
+            create_client("invalid_provider")  # type: ignore
 
 
 class TestGenerateSummaryWithProvider:
@@ -232,7 +232,7 @@ class TestGenerateSummaryStreamWithProvider:
 
     @patch.object(ClaudeAPIClient, "generate_summary_stream")
     @patch.object(ClaudeAPIClient, "initialize")
-    def test_stream_with_claude(self, mock_init, mock_stream):
+    def test_stream_with_claude(self, _mock_init, mock_stream):
         """Claude プロバイダーでストリームジェネレータを返す"""
         from app.external.api_factory import generate_summary_stream_with_provider
 
@@ -251,7 +251,7 @@ class TestGenerateSummaryStreamWithProvider:
 
     @patch.object(GeminiAPIClient, "generate_summary_stream")
     @patch.object(GeminiAPIClient, "initialize")
-    def test_stream_with_gemini(self, mock_init, mock_stream):
+    def test_stream_with_gemini(self, _mock_init, mock_stream):
         """Gemini プロバイダーでストリームジェネレータを返す"""
         from app.external.api_factory import generate_summary_stream_with_provider
 
@@ -268,7 +268,7 @@ class TestGenerateSummaryStreamWithProvider:
 
     @patch.object(ClaudeAPIClient, "generate_summary_stream")
     @patch.object(ClaudeAPIClient, "initialize")
-    def test_stream_passes_model_name(self, mock_init, mock_stream):
+    def test_stream_passes_model_name(self, _mock_init, mock_stream):
         """model_name がクライアントに渡される"""
         from app.external.api_factory import generate_summary_stream_with_provider
 

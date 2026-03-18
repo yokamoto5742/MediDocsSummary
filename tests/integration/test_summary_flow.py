@@ -3,7 +3,6 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 from unittest.mock import patch
 
-import pytest
 from fastapi import status
 
 from app.models.usage import SummaryUsage
@@ -79,7 +78,7 @@ class TestSyncSummaryGeneration:
         assert db_session.query(SummaryUsage).count() == 0
 
     def test_prompt_injection_is_rejected(
-        self, integration_client, db_session, csrf_headers
+        self, integration_client, csrf_headers
     ):
         """プロンプトインジェクション検出時はエラーを返す"""
         injection_text = (
@@ -133,7 +132,7 @@ class TestSyncSummaryGeneration:
         assert "2" in data["error_message"]
 
     def test_model_auto_switch_claude_to_gemini(
-        self, integration_client, db_session, csrf_headers
+        self, integration_client, csrf_headers
     ):
         """入力長がしきい値を超えるとClaudeからGeminiに自動切り替えされる"""
         low_threshold_settings = make_test_settings(max_token_threshold=50)
@@ -201,7 +200,7 @@ class TestSyncSummaryGeneration:
         assert data["model_used"] == "Claude"
 
     def test_xss_input_is_sanitized_before_ai_call(
-        self, integration_client, db_session, csrf_headers
+        self, integration_client, csrf_headers
     ):
         """XSSタグを含む入力がサニタイズされた上でAIに渡される"""
         medical_text_with_xss = (

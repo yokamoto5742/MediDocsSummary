@@ -48,8 +48,8 @@ def test_db():
     Base.metadata.create_all(bind=engine)
 
     def override_get_db():
+        db = TestingSessionLocal()
         try:
-            db = TestingSessionLocal()
             yield db
         finally:
             db.close()
@@ -60,7 +60,7 @@ def test_db():
 
     Base.metadata.drop_all(bind=engine)
     # get_settingsのオーバーライドは維持（autouse fixtureで管理）
-    db_override = app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.fixture

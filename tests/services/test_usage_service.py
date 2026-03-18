@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from app.core.constants import get_message
 from app.services.usage_service import DailyUsageSummary, check_daily_limit, get_daily_usage
 

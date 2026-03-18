@@ -173,7 +173,7 @@ class TestGetSecretKey:
 class TestSecurityHeadersMiddleware:
     """SecurityHeadersMiddleware のテスト"""
 
-    def _make_response(self, url: str = "http://testserver/") -> dict:
+    def _make_response(self, url: str = "http://testserver/"):
         """TestClient 経由でレスポンスヘッダーを取得するヘルパー"""
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
@@ -183,7 +183,7 @@ class TestSecurityHeadersMiddleware:
         mini_app.add_middleware(SecurityHeadersMiddleware)
 
         @mini_app.get("/")
-        def root():
+        def _root():
             return {"ok": True}
 
         with TestClient(mini_app, base_url=url) as c:

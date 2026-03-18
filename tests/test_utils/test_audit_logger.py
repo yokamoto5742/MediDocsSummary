@@ -1,5 +1,4 @@
 import json
-import logging
 from unittest.mock import patch
 
 from app.utils.audit_logger import log_audit_event

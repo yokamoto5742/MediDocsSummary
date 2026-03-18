@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from app.models.usage import SummaryUsage
 from app.services import statistics_service
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -80,18 +81,20 @@ def test_get_usage_records_with_limit(test_db, sample_usage_records):
 
 def test_get_usage_records_with_offset(test_db, sample_usage_records):
     """使用統計レコード取得 - offset指定"""
-    all_records = statistics_service.get_usage_records(test_db)
-    offset_records = statistics_service.get_usage_records(test_db, offset=1)
+    all_records: list[SummaryUsage] = statistics_service.get_usage_records(test_db)
+    offset_records: list[SummaryUsage] = statistics_service.get_usage_records(test_db, offset=1)
 
     assert len(offset_records) == 1
+    assert len(all_records) != 0
+    assert len(offset_records) != 0
     assert offset_records[0].id != all_records[0].id
 
 
 def test_get_usage_records_ordering(test_db, sample_usage_records):
     """使用統計レコード取得 - 降順ソート"""
-    records = statistics_service.get_usage_records(test_db)
-    if len(records) >= 2:
-        assert records[0].date >= records[1].date
+    records: list[SummaryUsage] = statistics_service.get_usage_records(test_db)
+    assert len(records) > 1
+    assert records[0].date >= records[1].date
 
 
 class TestApplyDefaultPeriod:

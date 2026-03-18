@@ -244,7 +244,7 @@ class TestExecuteEvaluation:
             )
 
         assert result.success is False
-        assert "Gemini APIエラー" in result.error_message
+        assert result.error_message is not None and "Gemini APIエラー" in result.error_message
 
     def test_generic_exception_returns_error_response(self):
         """一般例外: success=False で返る"""
@@ -326,7 +326,7 @@ class TestExecuteEvaluationStream:
         """正常系: SSE complete イベントが yield される"""
         import json
 
-        async def mock_stream_with_heartbeat(**kwargs):
+        async def mock_stream_with_heartbeat(**_kwargs):
             yield ("評価結果", 200, 80)
 
         from app.services.evaluation_service import execute_evaluation_stream

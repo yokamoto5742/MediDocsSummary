@@ -19,7 +19,8 @@ class TestApiExceptionHandler:
         request = MagicMock()
         exc = RuntimeError("内部エラー")
         response = await api_exception_handler(request, exc)
-        body = json.loads(response.body)
+        body_str = response.body if isinstance(response.body, str) else response.body.decode()  # type: ignore
+        body = json.loads(body_str)
         assert body["success"] is False
 
     async def test_error_message_is_exception_string(self):
@@ -27,7 +28,8 @@ class TestApiExceptionHandler:
         request = MagicMock()
         exc = RuntimeError("詳細なエラーメッセージ")
         response = await api_exception_handler(request, exc)
-        body = json.loads(response.body)
+        body_str = response.body if isinstance(response.body, str) else response.body.decode()  # type: ignore
+        body = json.loads(body_str)
         assert body["error_message"] == "詳細なエラーメッセージ"
 
 
@@ -46,7 +48,8 @@ class TestValidationExceptionHandler:
         request = MagicMock()
         exc = ValueError("バリデーションエラー")
         response = await validation_exception_handler(request, exc)
-        body = json.loads(response.body)
+        body_str = response.body if isinstance(response.body, str) else response.body.decode()  # type: ignore
+        body = json.loads(body_str)
         assert body["success"] is False
 
     async def test_error_message_is_exception_string(self):
@@ -54,5 +57,6 @@ class TestValidationExceptionHandler:
         request = MagicMock()
         exc = ValueError("フィールドが不正です")
         response = await validation_exception_handler(request, exc)
-        body = json.loads(response.body)
+        body_str = response.body if isinstance(response.body, str) else response.body.decode()  # type: ignore
+        body = json.loads(body_str)
         assert body["error_message"] == "フィールドが不正です"

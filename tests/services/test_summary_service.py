@@ -31,7 +31,7 @@ class TestValidateInput:
 
     def test_validate_input_none(self):
         """入力検証 - None"""
-        is_valid, error = validate_input(None)
+        is_valid, error = validate_input(None)  # type: ignore
         assert is_valid is False
         assert error == "カルテ情報を入力してください"
 
@@ -416,6 +416,7 @@ class TestExecuteSummaryGeneration:
             )
 
         assert result.success is False
+        assert result.error_message is not None
         assert "Gemini未設定" in result.error_message
 
     def test_get_provider_value_error(self):
@@ -439,6 +440,7 @@ class TestExecuteSummaryGeneration:
             )
 
         assert result.success is False
+        assert result.error_message is not None
         assert "モデル未設定" in result.error_message
 
     def test_api_call_exception(self):
@@ -463,6 +465,7 @@ class TestExecuteSummaryGeneration:
             )
 
         assert result.success is False
+        assert result.error_message is not None
         assert "API接続エラー" in result.error_message
 
 
@@ -501,7 +504,6 @@ class TestExecuteSummaryGenerationStream:
 
     async def test_validation_error_yields_sse_error(self):
         """入力バリデーション失敗: SSE error イベントを yield して終了"""
-        import json
         from app.services.summary_service import execute_summary_generation_stream
 
         with patch("app.services.summary_service.log_audit_event"), \
@@ -523,7 +525,6 @@ class TestExecuteSummaryGenerationStream:
 
     async def test_determine_model_error_yields_sse_error(self):
         """determine_model が ValueError: SSE error イベントを yield して終了"""
-        import json
         from app.services.summary_service import execute_summary_generation_stream
 
         with patch("app.services.summary_service.log_audit_event"), \
