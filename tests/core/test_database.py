@@ -30,7 +30,7 @@ class TestGetDb:
 
     def test_get_db_yields_session(self, sqlite_session_factory):
         """`get_db` はセッションを yield すること"""
-        with patch("app.core.database.SessionLocal", sqlite_session_factory):
+        with patch("app.core.database._SessionLocal", sqlite_session_factory):
             from app.core.database import get_db
             gen = get_db()
             session = next(gen)
@@ -48,7 +48,7 @@ class TestGetDb:
         mock_session = MagicMock()
         mock_factory = MagicMock(return_value=mock_session)
 
-        with patch("app.core.database.SessionLocal", mock_factory):
+        with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db
             gen = get_db()
             next(gen)
@@ -64,7 +64,7 @@ class TestGetDb:
         mock_session = MagicMock()
         mock_factory = MagicMock(return_value=mock_session)
 
-        with patch("app.core.database.SessionLocal", mock_factory):
+        with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db
             gen = cast(Generator, get_db())
             next(gen)
@@ -81,7 +81,7 @@ class TestGetDbSession:
 
     def test_get_db_session_yields_session(self, sqlite_session_factory):
         """`get_db_session` はセッションを yield すること"""
-        with patch("app.core.database.SessionLocal", sqlite_session_factory):
+        with patch("app.core.database._SessionLocal", sqlite_session_factory):
             from app.core.database import get_db_session
             with get_db_session() as session:
                 assert session is not None
@@ -93,7 +93,7 @@ class TestGetDbSession:
         mock_session = MagicMock()
         mock_factory = MagicMock(return_value=mock_session)
 
-        with patch("app.core.database.SessionLocal", mock_factory):
+        with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
             with get_db_session():
                 pass
@@ -107,7 +107,7 @@ class TestGetDbSession:
         mock_session = MagicMock()
         mock_factory = MagicMock(return_value=mock_session)
 
-        with patch("app.core.database.SessionLocal", mock_factory):
+        with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
             with pytest.raises(ValueError, match="テストエラー"):
                 with get_db_session():
@@ -119,7 +119,7 @@ class TestGetDbSession:
             mock_session = MagicMock()
             mock_factory = MagicMock(return_value=mock_session)
 
-            with patch("app.core.database.SessionLocal", mock_factory):
+            with patch("app.core.database._SessionLocal", mock_factory):
                 from app.core.database import get_db_session
                 try:
                     with get_db_session():
@@ -135,7 +135,7 @@ class TestGetDbSession:
         mock_session = MagicMock()
         mock_factory = MagicMock(return_value=mock_session)
 
-        with patch("app.core.database.SessionLocal", mock_factory):
+        with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
             with pytest.raises(ValueError, match="DB書き込みエラー"):
                 with get_db_session():
@@ -146,7 +146,7 @@ class TestGetDbSession:
         mock_session = MagicMock()
         mock_factory = MagicMock(return_value=mock_session)
 
-        with patch("app.core.database.SessionLocal", mock_factory):
+        with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
             try:
                 with get_db_session():
@@ -162,7 +162,7 @@ class TestGetDbSession:
         """正常系: コミット後にデータが永続化されること"""
         from app.models.prompt import Prompt
 
-        with patch("app.core.database.SessionLocal", sqlite_session_factory):
+        with patch("app.core.database._SessionLocal", sqlite_session_factory):
             from app.core.database import get_db_session
 
             # データ書き込み
@@ -188,7 +188,7 @@ class TestGetDbSession:
         """異常系: ロールバック後にデータが残らないこと"""
         from app.models.prompt import Prompt
 
-        with patch("app.core.database.SessionLocal", sqlite_session_factory):
+        with patch("app.core.database._SessionLocal", sqlite_session_factory):
             from app.core.database import get_db_session
 
             try:
