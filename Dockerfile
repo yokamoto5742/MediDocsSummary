@@ -16,16 +16,17 @@ WORKDIR /app
 # uvのインストール
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+# 設定ファイルとソースを先にコピー
 COPY pyproject.toml uv.lock ./
 COPY app/ app/
 COPY alembic/ alembic/
 COPY alembic.ini .
-
-# フロントエンドのビルド成果物をコピー
 COPY --from=frontend-builder /app/app/static/dist app/static/dist
 
-# ソースコードが存在する状態で uv sync を実行
-RUN uv sync --frozen --no-dev --no-install-project --system
+# システム環境にインストールするための設定
+ENV UV_PROJECT_ENVIRONMENT="/usr/local"
+# uv sync から --system を削除
+RUN uv sync --frozen --no-dev --no-install-project
 
 EXPOSE 8000
 
