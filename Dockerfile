@@ -11,15 +11,15 @@ RUN npm run build
 
 # Stage 2: Python本番イメージ
 FROM python:3.13-slim
-
 WORKDIR /app
 
 # uvの最新バージョン
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# 本番依存のみインストール
-COPY requirements.lock .
-RUN uv pip install --no-cache-dir --system --require-hashes -r requirements.lock
+# ロックファイルをコピーして同期
+COPY pyproject.toml uv.lock ./
+#　本番依存のみシステム環境にインストール
+RUN uv sync --frozen --no-dev --no-install-project --system
 
 # フロントエンドビルド成果物をコピー
 COPY --from=frontend-builder /app/app/static/dist app/static/dist
