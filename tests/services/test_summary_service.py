@@ -165,10 +165,10 @@ class TestDetermineModel:
         assert model == "Claude"
         assert switched is False
 
-    @patch("app.services.prompt_service.get_prompt")
-    @patch("app.core.database.get_db_session")
+    @patch("app.services.prompt_service.get_selected_model")
+    @patch("app.services.model_selector.get_db_session")
     @patch("app.services.model_selector.settings")
-    def test_determine_model_from_prompt(self, mock_settings, mock_db_session, mock_get_prompt):
+    def test_determine_model_from_prompt(self, mock_settings, mock_db_session, mock_get_selected_model):
         """モデル決定 - プロンプトから取得"""
         from unittest.mock import MagicMock
 
@@ -178,10 +178,8 @@ class TestDetermineModel:
         mock_db = MagicMock()
         mock_db_session.return_value.__enter__.return_value = mock_db
 
-        # モックプロンプト
-        mock_prompt = MagicMock()
-        mock_prompt.selected_model = "Gemini_Pro"
-        mock_get_prompt.return_value = mock_prompt
+        # get_selected_model が "Gemini_Pro" を返す
+        mock_get_selected_model.return_value = "Gemini_Pro"
 
         model, switched = determine_model(requested_model="Claude", input_length=10000, department="眼科",
                                           document_type="他院への紹介", doctor="橋本義弘")
