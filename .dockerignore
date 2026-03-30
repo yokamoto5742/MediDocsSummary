@@ -5,7 +5,6 @@
 .git
 .gitignore
 .idea
-pyproject.toml
 
 # --- ビルド・実行 ---
 *.log
