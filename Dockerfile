@@ -13,20 +13,19 @@ RUN npm run build
 FROM python:3.13-slim
 WORKDIR /app
 
-# uvの最新バージョン
+# uvのインストール
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# ロックファイルをコピーして同期
 COPY pyproject.toml uv.lock ./
-#　本番依存のみシステム環境にインストール
-RUN uv sync --frozen --no-dev --no-install-project --system
-
-# フロントエンドビルド成果物をコピー
-COPY --from=frontend-builder /app/app/static/dist app/static/dist
-
 COPY app/ app/
 COPY alembic/ alembic/
 COPY alembic.ini .
+
+# フロントエンドのビルド成果物をコピー
+COPY --from=frontend-builder /app/app/static/dist app/static/dist
+
+# ソースコードが存在する状態で uv sync を実行
+RUN uv sync --frozen --no-dev --no-install-project --system
 
 EXPOSE 8000
 
