@@ -69,7 +69,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('Claude Codeがユーザーに質問しています', 'Claude Code - 質問', 'OK', 'Information')\""
+            "command": "powershell -File .claude/hooks/pre-tool-ask-question.ps1",
+            "shell": "powershell"
           }
         ]
       }
@@ -80,21 +81,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "powershell -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('タスクが完了しました', 'Claude Code', 'OK', 'Information')\""
+            "command": "powershell -File .claude/hooks/stop-notification.ps1",
+            "shell": "powershell"
           }
         ]
       }
     ],
-    "SessionEnd": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cmd /c start /b powershell -NoProfile -Command \"Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.MessageBox]::Show('セッションが終了しました', 'Claude Code', 'OK', 'Information')\""
-          }
-        ]
-      }
-    ]
   }
 }
