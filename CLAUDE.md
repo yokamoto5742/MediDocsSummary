@@ -14,18 +14,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # 開発サーバー起動
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# テスト実行（全件）
-python -m pytest tests/ -v --tb=short
-
-# テスト実行（単一ファイル）
-python -m pytest tests/services/test_summary_service.py -v
-
-# テスト実行（単一テスト）
-python -m pytest tests/services/test_summary_service.py::test_generate_summary -v
-
-# カバレッジ付きテスト
-python -m pytest tests/ -v --tb=short --cov=app --cov-report=html
-
 # 型チェック
 pyright
 ```
@@ -38,14 +26,6 @@ npm install
 npm run dev        # 開発サーバー（ポート5173、/api を localhost:8000 にプロキシ）
 npm run build      # 本番ビルド → ../app/static/dist/ に出力
 npm run typecheck  # TypeScript 型チェック
-```
-
-### データベースマイグレーション
-
-```bash
-alembic revision --autogenerate -m "説明"
-alembic upgrade head
-alembic downgrade -1
 ```
 
 ## アーキテクチャ
