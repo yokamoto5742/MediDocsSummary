@@ -16,7 +16,6 @@ def create_mock_settings(**kwargs):
     mock.google_location = kwargs.get("google_location", "global")
     mock.google_credentials_json = kwargs.get("google_credentials_json", None)
     mock.gemini_thinking_level = kwargs.get("gemini_thinking_level", "HIGH")
-    mock.gemini_evaluation_model = kwargs.get("gemini_evaluation_model", "gemini-eval")
     return mock
 
 
@@ -59,7 +58,9 @@ class TestGeminiAPIClientInitialize:
     """GeminiAPIClient initialize メソッドのテスト"""
 
     @patch("app.external.gemini_api.genai.Client")
-    @patch("app.external.gemini_api.service_account.Credentials.from_service_account_info")
+    @patch(
+        "app.external.gemini_api.service_account.Credentials.from_service_account_info"
+    )
     @patch("app.external.gemini_api.get_settings")
     def test_initialize_with_credentials_json_success(
         self, mock_get_settings, mock_from_service_account_info, mock_genai_client
@@ -79,7 +80,7 @@ class TestGeminiAPIClientInitialize:
         mock_get_settings.return_value = create_mock_settings(
             google_project_id="test-project-123",
             google_location="us-central1",
-            google_credentials_json=json.dumps(credentials_dict)
+            google_credentials_json=json.dumps(credentials_dict),
         )
 
         mock_credentials = MagicMock()
@@ -115,7 +116,7 @@ class TestGeminiAPIClientInitialize:
         mock_get_settings.return_value = create_mock_settings(
             google_project_id="test-project-456",
             google_location="global",
-            google_credentials_json=None
+            google_credentials_json=None,
         )
 
         mock_client_instance = MagicMock()
@@ -136,9 +137,7 @@ class TestGeminiAPIClientInitialize:
     @patch("app.external.gemini_api.get_settings")
     def test_initialize_missing_project_id(self, mock_get_settings):
         """initialize - GOOGLE_PROJECT_ID 未設定"""
-        mock_get_settings.return_value = create_mock_settings(
-            google_project_id=None
-        )
+        mock_get_settings.return_value = create_mock_settings(google_project_id=None)
 
         client = GeminiAPIClient()
 
@@ -161,7 +160,9 @@ class TestGeminiAPIClientInitialize:
 
         assert "認証情報JSONのパースに失敗しました" in str(exc_info.value)
 
-    @patch("app.external.gemini_api.service_account.Credentials.from_service_account_info")
+    @patch(
+        "app.external.gemini_api.service_account.Credentials.from_service_account_info"
+    )
     @patch("app.external.gemini_api.get_settings")
     def test_initialize_missing_credential_fields(
         self, mock_get_settings, mock_from_service_account_info
@@ -199,7 +200,9 @@ class TestGeminiAPIClientInitialize:
         assert "Vertex AI初期化エラー" in error_message
         assert "API接続エラー" in error_message
 
-    @patch("app.external.gemini_api.service_account.Credentials.from_service_account_info")
+    @patch(
+        "app.external.gemini_api.service_account.Credentials.from_service_account_info"
+    )
     @patch("app.external.gemini_api.get_settings")
     def test_initialize_credentials_creation_error(
         self, mock_get_settings, mock_from_service_account_info
@@ -405,7 +408,7 @@ class TestGeminiAPIClientIntegration:
             google_location="global",
             gemini_model="gemini-1.5-pro-002",
             gemini_thinking_level="HIGH",
-            google_credentials_json=None
+            google_credentials_json=None,
         )
 
         mock_db = MagicMock()
@@ -435,9 +438,7 @@ class TestGeminiAPIClientIntegration:
     @patch("app.external.gemini_api.get_settings")
     def test_generate_summary_initialization_error(self, mock_get_settings):
         """generate_summary - 初期化エラー"""
-        mock_get_settings.return_value = create_mock_settings(
-            google_project_id=None
-        )
+        mock_get_settings.return_value = create_mock_settings(google_project_id=None)
 
         client = GeminiAPIClient()
 
@@ -524,9 +525,7 @@ class TestGeminiAPIClientEdgeCases:
     @patch("app.external.gemini_api.get_settings")
     def test_initialize_empty_project_id(self, mock_get_settings, mock_genai_client):
         """initialize - 空の PROJECT_ID"""
-        mock_get_settings.return_value = create_mock_settings(
-            google_project_id=""
-        )
+        mock_get_settings.return_value = create_mock_settings(google_project_id="")
 
         client = GeminiAPIClient()
 
@@ -544,7 +543,7 @@ class TestGeminiAPIClientEdgeCases:
         mock_get_settings.return_value = create_mock_settings(
             google_project_id="test-project",
             google_location="global",
-            google_credentials_json=""
+            google_credentials_json="",
         )
 
         mock_client_instance = MagicMock()
@@ -569,7 +568,6 @@ class TestGeminiAPIClientEvaluationModel:
         """初期化 - 評価用モデル指定"""
         mock_get_settings.return_value = create_mock_settings(
             gemini_model="gemini-1.5-pro-002",
-            gemini_evaluation_model="gemini-eval-model"
         )
 
         client = GeminiAPIClient(model_name="gemini-eval-model")
@@ -581,8 +579,7 @@ class TestGeminiAPIClientEvaluationModel:
     def test_evaluation_flow(self, mock_get_settings, mock_genai_client):
         """評価フローのテスト"""
         mock_settings = create_mock_settings(
-            google_credentials_json=None,
-            gemini_thinking_level="HIGH"
+            google_credentials_json=None, gemini_thinking_level="HIGH"
         )
         mock_get_settings.return_value = mock_settings
 
@@ -599,8 +596,7 @@ class TestGeminiAPIClientEvaluationModel:
         client.initialize()
 
         result = client._generate_content(
-            prompt="評価プロンプト",
-            model_name="gemini-eval-model"
+            prompt="評価プロンプト", model_name="gemini-eval-model"
         )
 
         assert result == ("評価結果", 500, 200)
@@ -613,10 +609,13 @@ class TestGeminiAPIClientNetworkErrors:
     def test_generate_content_connection_timeout(self, mock_get_settings):
         """接続タイムアウト時に APIError を発生させること"""
         import socket
+
         mock_get_settings.return_value = create_mock_settings()
 
         mock_client = MagicMock()
-        mock_client.models.generate_content.side_effect = socket.timeout("接続タイムアウト")
+        mock_client.models.generate_content.side_effect = socket.timeout(
+            "接続タイムアウト"
+        )
 
         client = GeminiAPIClient()
         client.client = mock_client
@@ -633,7 +632,9 @@ class TestGeminiAPIClientNetworkErrors:
         mock_get_settings.return_value = create_mock_settings()
 
         mock_client = MagicMock()
-        mock_client.models.generate_content.side_effect = ConnectionResetError("接続がリセットされました")
+        mock_client.models.generate_content.side_effect = ConnectionResetError(
+            "接続がリセットされました"
+        )
 
         client = GeminiAPIClient()
         client.client = mock_client
@@ -650,7 +651,9 @@ class TestGeminiAPIClientNetworkErrors:
         mock_get_settings.return_value = create_mock_settings()
 
         mock_client = MagicMock()
-        mock_client.models.generate_content.side_effect = Exception("503 Service Unavailable")
+        mock_client.models.generate_content.side_effect = Exception(
+            "503 Service Unavailable"
+        )
 
         client = GeminiAPIClient()
         client.client = mock_client
@@ -666,17 +669,24 @@ class TestGeminiAPIClientNetworkErrors:
     def test_generate_content_stream_connection_timeout(self, mock_get_settings):
         """ストリーム生成中のタイムアウト時に APIError を発生させること"""
         import socket
+
         mock_get_settings.return_value = create_mock_settings()
 
         mock_client = MagicMock()
-        mock_client.models.generate_content_stream.side_effect = socket.timeout("ストリームタイムアウト")
+        mock_client.models.generate_content_stream.side_effect = socket.timeout(
+            "ストリームタイムアウト"
+        )
 
         client = GeminiAPIClient()
         client.client = mock_client
         client.settings = mock_get_settings.return_value
 
         with pytest.raises(APIError) as exc_info:
-            list(client._generate_content_stream(prompt="テスト", model_name="test-model"))
+            list(
+                client._generate_content_stream(
+                    prompt="テスト", model_name="test-model"
+                )
+            )
 
         assert "Vertex AI API呼び出しエラー" in str(exc_info.value)
 
@@ -697,7 +707,11 @@ class TestGeminiAPIClientNetworkErrors:
         client.settings = mock_get_settings.return_value
 
         with pytest.raises(APIError) as exc_info:
-            list(client._generate_content_stream(prompt="テスト", model_name="test-model"))
+            list(
+                client._generate_content_stream(
+                    prompt="テスト", model_name="test-model"
+                )
+            )
 
         assert "Vertex AI API呼び出しエラー" in str(exc_info.value)
 

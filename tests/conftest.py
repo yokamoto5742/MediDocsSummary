@@ -83,8 +83,13 @@ def client(test_db):
 def sample_prompts(test_db):
     """テスト用のサンプルプロンプト"""
     prompts = [
-        Prompt(department="default", doctor="default", document_type="他院への紹介", content="デフォルトプロンプト",
-               is_default=True),
+        Prompt(
+            department="default",
+            doctor="default",
+            document_type="他院への紹介",
+            content="デフォルトプロンプト",
+            is_default=True,
+        ),
         Prompt(
             department="眼科",
             doctor="橋本義弘",
@@ -122,7 +127,7 @@ def sample_usage_records(test_db):
             department="default",
             doctor="default",
             document_type="返書",
-            model="Gemini_Pro",
+            model="Gemini",
             input_tokens=2000,
             output_tokens=800,
             processing_time=3.2,

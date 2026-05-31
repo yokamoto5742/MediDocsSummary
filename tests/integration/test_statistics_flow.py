@@ -1,4 +1,5 @@
 """統合テスト: 統計・使用量フロー"""
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from unittest.mock import patch
@@ -15,21 +16,25 @@ _VALID_MEDICAL_TEXT = (
 )
 
 
-def _add_usage(db_session, model: str, department: str, days_ago: int = 0, count: int = 1):
+def _add_usage(
+    db_session, model: str, department: str, days_ago: int = 0, count: int = 1
+):
     """テスト用使用量レコードを挿入"""
     date = datetime.now(JST) - timedelta(days=days_ago)
     for _ in range(count):
-        db_session.add(SummaryUsage(
-            date=date,
-            department=department,
-            doctor="default",
-            document_type="退院時サマリ",
-            model=model,
-            input_tokens=100,
-            output_tokens=50,
-            processing_time=1.0,
-            app_type="dischargesummary",
-        ))
+        db_session.add(
+            SummaryUsage(
+                date=date,
+                department=department,
+                doctor="default",
+                document_type="退院時サマリ",
+                model=model,
+                input_tokens=100,
+                output_tokens=50,
+                processing_time=1.0,
+                app_type="dischargesummary",
+            )
+        )
     db_session.commit()
 
 
@@ -89,12 +94,16 @@ class TestStatisticsFiltering:
     def test_model_filter(self, integration_client, db_session, csrf_headers):
         """モデルフィルターが正しく機能する"""
         _add_usage(db_session, "Claude", "内科", count=3)
-        _add_usage(db_session, "Gemini_Pro", "外科", count=2)
+        _add_usage(db_session, "Gemini", "外科", count=2)
 
-        res = integration_client.get("/api/statistics/summary", params={"model": "Claude"})
+        res = integration_client.get(
+            "/api/statistics/summary", params={"model": "Claude"}
+        )
         assert res.json()["total_count"] == 3
 
-        res = integration_client.get("/api/statistics/summary", params={"model": "Gemini_Pro"})
+        res = integration_client.get(
+            "/api/statistics/summary", params={"model": "Gemini"}
+        )
         assert res.json()["total_count"] == 2
 
     def test_date_filter_excludes_old_records(
@@ -134,7 +143,7 @@ class TestStatisticsFiltering:
     ):
         """集計レコードのモデルフィルターが機能する"""
         _add_usage(db_session, "Claude", "内科", count=2)
-        _add_usage(db_session, "Gemini_Pro", "内科")
+        _add_usage(db_session, "Gemini", "内科")
 
         res = integration_client.get(
             "/api/statistics/aggregated", params={"model": "Claude"}

@@ -166,8 +166,8 @@ def test_get_selected_model_with_no_prompt(client, test_db):
         params={
             "department": "default",
             "document_type": "他院への紹介",
-            "doctor": "default"
-        }
+            "doctor": "default",
+        },
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -184,8 +184,8 @@ def test_get_selected_model_with_prompt(client, test_db, sample_prompts):
         params={
             "department": test_prompt.department,
             "document_type": test_prompt.document_type,
-            "doctor": test_prompt.doctor
-        }
+            "doctor": test_prompt.doctor,
+        },
     )
 
     assert response.status_code == status.HTTP_200_OK
@@ -204,7 +204,7 @@ def test_get_selected_model_hierarchical_lookup(client, test_db):
         document_type="他院への紹介",
         doctor="default",
         content="診療科レベルのプロンプト",
-        selected_model="Gemini_Pro"
+        selected_model="Gemini",
     )
     test_db.add(dept_prompt)
     test_db.commit()
@@ -215,13 +215,13 @@ def test_get_selected_model_hierarchical_lookup(client, test_db):
         params={
             "department": "眼科",
             "document_type": "他院への紹介",
-            "doctor": "橋本義弘"
-        }
+            "doctor": "橋本義弘",
+        },
     )
 
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
-    assert data["selected_model"] == "Gemini_Pro"
+    assert data["selected_model"] == "Gemini"
 
 
 def test_get_selected_model_missing_parameters(client, test_db):

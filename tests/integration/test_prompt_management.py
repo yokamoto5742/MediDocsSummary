@@ -1,4 +1,5 @@
 """統合テスト: プロンプト管理（CRUD + 階層的解決）"""
+
 from unittest.mock import patch
 
 from fastapi import status
@@ -20,9 +21,7 @@ _VALID_MEDICAL_TEXT = (
 
 
 class TestPromptCRUD:
-    def test_create_and_retrieve(
-        self, integration_client, db_session, csrf_headers
-    ):
+    def test_create_and_retrieve(self, integration_client, db_session, csrf_headers):
         """プロンプト作成後に取得できる"""
         create_res = integration_client.post(
             "/api/prompts/", json=_BASE_PROMPT, headers=csrf_headers
@@ -37,9 +36,7 @@ class TestPromptCRUD:
         assert data["content"] == "内科用退院時サマリプロンプト"
         assert data["selected_model"] == "Claude"
 
-    def test_update_via_re_post(
-        self, integration_client, db_session, csrf_headers
-    ):
+    def test_update_via_re_post(self, integration_client, db_session, csrf_headers):
         """同一キーで再POSTすると内容が更新される（重複作成されない）"""
         create_res = integration_client.post(
             "/api/prompts/", json=_BASE_PROMPT, headers=csrf_headers
@@ -57,16 +54,16 @@ class TestPromptCRUD:
         get_res = integration_client.get(f"/api/prompts/{prompt_id}")
         assert get_res.json()["content"] == "更新後のプロンプト内容"
 
-    def test_delete_makes_404(
-        self, integration_client, db_session, csrf_headers
-    ):
+    def test_delete_makes_404(self, integration_client, db_session, csrf_headers):
         """削除後は404が返る"""
         create_res = integration_client.post(
             "/api/prompts/", json=_BASE_PROMPT, headers=csrf_headers
         )
         prompt_id = create_res.json()["id"]
 
-        del_res = integration_client.delete(f"/api/prompts/{prompt_id}", headers=csrf_headers)
+        del_res = integration_client.delete(
+            f"/api/prompts/{prompt_id}", headers=csrf_headers
+        )
         assert del_res.status_code == status.HTTP_200_OK
 
         get_res = integration_client.get(f"/api/prompts/{prompt_id}")
@@ -94,22 +91,34 @@ class TestHierarchicalPromptResolution:
     ):
         """診療科+医師固有プロンプトが診療科デフォルトより優先される"""
         # 診療科デフォルト（Gemini）
-        db_session.add(Prompt(
-            department="内科", doctor="default",
-            document_type="退院時サマリ", content="内科デフォルト",
-            selected_model="Gemini_Pro",
-        ))
+        db_session.add(
+            Prompt(
+                department="内科",
+                doctor="default",
+                document_type="退院時サマリ",
+                content="内科デフォルト",
+                selected_model="Gemini",
+            )
+        )
         # 医師固有（Claude）
-        db_session.add(Prompt(
-            department="内科", doctor="田中一郎",
-            document_type="退院時サマリ", content="田中医師固有",
-            selected_model="Claude",
-        ))
+        db_session.add(
+            Prompt(
+                department="内科",
+                doctor="田中一郎",
+                document_type="退院時サマリ",
+                content="田中医師固有",
+                selected_model="Claude",
+            )
+        )
         db_session.commit()
 
         res = integration_client.get(
             "/api/settings/selected-model",
-            params={"department": "内科", "document_type": "退院時サマリ", "doctor": "田中一郎"},
+            params={
+                "department": "内科",
+                "document_type": "退院時サマリ",
+                "doctor": "田中一郎",
+            },
         )
         assert res.status_code == status.HTTP_200_OK
         assert res.json()["selected_model"] == "Claude"
@@ -118,34 +127,50 @@ class TestHierarchicalPromptResolution:
         self, integration_client, db_session, csrf_headers
     ):
         """医師固有プロンプト未設定時は診療科デフォルトにフォールバック"""
-        db_session.add(Prompt(
-            department="内科", doctor="default",
-            document_type="退院時サマリ", content="内科デフォルト",
-            selected_model="Gemini_Pro",
-        ))
+        db_session.add(
+            Prompt(
+                department="内科",
+                doctor="default",
+                document_type="退院時サマリ",
+                content="内科デフォルト",
+                selected_model="Gemini",
+            )
+        )
         db_session.commit()
 
         res = integration_client.get(
             "/api/settings/selected-model",
-            params={"department": "内科", "document_type": "退院時サマリ", "doctor": "山田二郎"},
+            params={
+                "department": "内科",
+                "document_type": "退院時サマリ",
+                "doctor": "山田二郎",
+            },
         )
         assert res.status_code == status.HTTP_200_OK
-        assert res.json()["selected_model"] == "Gemini_Pro"
+        assert res.json()["selected_model"] == "Gemini"
 
     def test_global_default_fallback(
         self, integration_client, db_session, csrf_headers
     ):
         """診療科プロンプト未設定時はグローバルデフォルトにフォールバック"""
-        db_session.add(Prompt(
-            department="default", doctor="default",
-            document_type="退院時サマリ", content="グローバル",
-            selected_model="Claude",
-        ))
+        db_session.add(
+            Prompt(
+                department="default",
+                doctor="default",
+                document_type="退院時サマリ",
+                content="グローバル",
+                selected_model="Claude",
+            )
+        )
         db_session.commit()
 
         res = integration_client.get(
             "/api/settings/selected-model",
-            params={"department": "整形外科", "document_type": "退院時サマリ", "doctor": "鈴木三郎"},
+            params={
+                "department": "整形外科",
+                "document_type": "退院時サマリ",
+                "doctor": "鈴木三郎",
+            },
         )
         assert res.status_code == status.HTTP_200_OK
         assert res.json()["selected_model"] == "Claude"
@@ -156,7 +181,11 @@ class TestHierarchicalPromptResolution:
         """プロンプト未設定時はselected_modelがnullを返す"""
         res = integration_client.get(
             "/api/settings/selected-model",
-            params={"department": "眼科", "document_type": "退院時サマリ", "doctor": "default"},
+            params={
+                "department": "眼科",
+                "document_type": "退院時サマリ",
+                "doctor": "default",
+            },
         )
         assert res.status_code == status.HTTP_200_OK
         assert res.json()["selected_model"] is None
@@ -165,11 +194,15 @@ class TestHierarchicalPromptResolution:
         self, integration_client, db_session, csrf_headers
     ):
         """プロンプトに設定されたモデルがサマリ生成で使用される"""
-        db_session.add(Prompt(
-            department="内科", doctor="default",
-            document_type="退院時サマリ", content="内科プロンプト",
-            selected_model="Gemini_Pro",
-        ))
+        db_session.add(
+            Prompt(
+                department="内科",
+                doctor="default",
+                document_type="退院時サマリ",
+                content="内科プロンプト",
+                selected_model="Gemini",
+            )
+        )
         db_session.commit()
 
         captured: dict = {}
@@ -198,13 +231,11 @@ class TestHierarchicalPromptResolution:
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["success"] is True
-        assert data["model_used"] == "Gemini_Pro"
+        assert data["model_used"] == "Gemini"
 
 
 class TestEvaluationPromptCRUD:
-    def test_full_crud_flow(
-        self, integration_client, db_session, csrf_headers
-    ):
+    def test_full_crud_flow(self, integration_client, db_session, csrf_headers):
         """評価プロンプトの作成・取得・更新・削除の一連フロー"""
         # 作成
         create_res = integration_client.post(
@@ -250,7 +281,10 @@ class TestEvaluationPromptCRUD:
         for doc_type in ["退院時サマリ", "現病歴"]:
             integration_client.post(
                 "/api/evaluation/prompts",
-                json={"document_type": doc_type, "content": f"{doc_type}用評価プロンプト"},
+                json={
+                    "document_type": doc_type,
+                    "content": f"{doc_type}用評価プロンプト",
+                },
                 headers=csrf_headers,
             )
 

@@ -126,8 +126,10 @@ GOOGLE_CREDENTIALS_JSON={"type":"service_account","project_id":"your-project",..
 GOOGLE_PROJECT_ID=your-gcp-project-id
 GOOGLE_LOCATION=global
 GEMINI_MODEL=gemini-2.5-flash
-GEMINI_EVALUATION_MODEL=gemini-2.5-flash
 GEMINI_THINKING_LEVEL=HIGH
+
+# 評価に使用するモデル（Claude / Gemini）
+EVALUATION_MODEL=Gemini
 ```
 
 ### アプリケーション設定
@@ -312,7 +314,7 @@ result = client.generate_summary(medical_text, additional_info, ...)
 
 `app/core/constants.py`で定数を一元管理：
 
-- `ModelType` Enum: "Claude"、"Gemini_Pro"などのモデル名
+- `ModelType` Enum: "Claude"、"Gemini"などのモデル名
 - `APIProvider` Enum: CLAUDE、GEMINI
 - 診療科・医師マッピング
 - 文書タイプ
@@ -461,7 +463,7 @@ pyright
   - `ANTHROPIC_MODEL`環境変数の設定確認
 - **Gemini API エラー**:
   - Google Cloud プロジェクト ID と認証情報が正しいか確認
-  - `GEMINI_EVALUATION_MODEL`環境変数が設定されているか確認
+  - `EVALUATION_MODEL`環境変数が設定されているか確認（Claude / Gemini）
   - Vertex AIが有効化されているか確認
 
 ### テスト失敗

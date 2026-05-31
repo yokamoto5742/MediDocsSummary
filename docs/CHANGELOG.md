@@ -7,6 +7,24 @@
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-05-31
+
+### 追加
+
+- **評価モデルのマルチプロバイダー対応**: 評価機能がClaudeとGemini両方をサポート。`_resolve_evaluation_model()` 関数でEVALUATION_MODELの値に応じてプロバイダーとモデルを動的に解決
+- **テストの大幅拡充**: evaluation_service、summary_service、外部API、統合テストを全面的に拡張し、より堅牢なテストカバレッジを実現
+
+### 変更
+
+- **評価設定のリネーム（破壊的変更）**: 環境変数 `GEMINI_EVALUATION_MODEL` を `EVALUATION_MODEL` に変更。設定キーも `gemini_evaluation_model` から `evaluation_model` に統一
+- **ModelType定数の更新**: `ModelType.GEMINI_PRO` の値を "Gemini_Pro" から "Gemini" に変更し、モデルタイプの一貫性を改善
+- **APIクライアント生成**: GeminiAPIClientの直接利用から `api_factory.create_client()` 経由での生成に統一し、プロバイダー切り替えを容易化
+- **コードスタイル統一**: ruffフォーマッタにより、trailing comma、文字列クォート、コードフォーマットを統一
+
+### 破壊的変更
+
+環境変数 `GEMINI_EVALUATION_MODEL` を使用している場合は、`EVALUATION_MODEL` に更新してください。値は "Claude" または "Gemini" を指定してください。
+
 ## [1.0.3] - 2026-03-18
 
 ### 追加
@@ -95,7 +113,8 @@
 - **README ドキュメント**: 不要な設定項目を削除し、ドキュメント品質を改善
 - **依存関係**: requirements.txt を更新し、最新のライブラリバージョンに対応
 
-[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.0...v1.0.1

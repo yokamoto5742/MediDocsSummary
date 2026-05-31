@@ -2,9 +2,9 @@ import time
 from typing import AsyncGenerator, cast
 
 from app.core.config import get_settings
-from app.core.constants import MESSAGES, get_message
+from app.core.constants import MESSAGES, ModelType, get_message
 from app.core.database import get_db_session
-from app.external.gemini_api import GeminiAPIClient
+from app.external.api_factory import APIProvider, create_client
 from app.schemas.evaluation import EvaluationResponse
 from app.services.evaluation_prompt_service import get_evaluation_prompt
 from app.services.sse_helpers import sse_event, stream_with_heartbeat
@@ -14,6 +14,28 @@ from app.utils.exceptions import APIError
 from app.utils.input_sanitizer import sanitize_medical_text, validate_medical_input
 
 settings = get_settings()
+
+
+def _resolve_evaluation_model() -> tuple[str | None, str | None, str | None]:
+    """EVALUATION_MODELからプロバイダーとモデル名を解決"""
+    if settings.evaluation_model == ModelType.CLAUDE:
+        if not settings.anthropic_model:
+            return None, None, MESSAGES["CONFIG"]["ANTHROPIC_MODEL_MISSING"]
+        return APIProvider.CLAUDE.value, settings.anthropic_model, None
+
+    if settings.evaluation_model == ModelType.GEMINI_PRO:
+        if not settings.gemini_model:
+            return None, None, MESSAGES["CONFIG"]["GEMINI_MODEL_NOT_SET"]
+        return APIProvider.GEMINI.value, settings.gemini_model, None
+
+    if not settings.evaluation_model:
+        return None, None, MESSAGES["CONFIG"]["EVALUATION_MODEL_MISSING"]
+
+    return (
+        None,
+        None,
+        MESSAGES["CONFIG"]["UNSUPPORTED_MODEL"].format(model=settings.evaluation_model),
+    )
 
 
 def _error_response(error_msg: str, processing_time: float = 0.0) -> EvaluationResponse:
@@ -48,8 +70,9 @@ def _validate_and_get_prompt(
         if not is_valid:
             return None, error_msg
 
-    if not settings.gemini_evaluation_model:
-        return None, MESSAGES["CONFIG"]["EVALUATION_MODEL_MISSING"]
+    _, _, model_error = _resolve_evaluation_model()
+    if model_error:
+        return None, model_error
 
     with get_db_session() as db:
         prompt_data = get_evaluation_prompt(db, document_type)
@@ -65,7 +88,7 @@ def build_evaluation_prompt(
     input_text: str,
     current_prescription: str,
     additional_info: str,
-    output_summary: str
+    output_summary: str,
 ) -> str:
     """評価用プロンプトを構築"""
     return f"""{prompt_template}
@@ -108,7 +131,9 @@ def execute_evaluation(
     additional_info = sanitize_medical_text(additional_info or "")
     output_summary = sanitize_medical_text(output_summary)
 
-    prompt_template, error_msg = _validate_and_get_prompt(output_summary, document_type, input_text)
+    prompt_template, error_msg = _validate_and_get_prompt(
+        output_summary, document_type, input_text
+    )
     if error_msg:
         log_audit_event(
             event_type=get_message("AUDIT", "EVALUATION_FAILURE"),
@@ -120,7 +145,8 @@ def execute_evaluation(
         return _error_response(error_msg)
 
     assert prompt_template is not None
-    model_name = settings.gemini_evaluation_model
+    provider, model_name, _ = _resolve_evaluation_model()
+    assert provider is not None
     assert model_name is not None
 
     full_prompt = build_evaluation_prompt(
@@ -128,12 +154,12 @@ def execute_evaluation(
         input_text,
         current_prescription,
         additional_info,
-        output_summary
+        output_summary,
     )
 
     start_time = time.time()
     try:
-        client = GeminiAPIClient(model_name=model_name)
+        client = create_client(provider)
         client.initialize()
 
         evaluation_text, input_tokens, output_tokens = client._generate_content(
@@ -155,7 +181,7 @@ def execute_evaluation(
             evaluation_result=evaluation_text,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            processing_time=processing_time
+            processing_time=processing_time,
         )
 
     except APIError as e:
@@ -185,7 +211,7 @@ def _run_sync_evaluation(
     current_prescription: str,
     additional_info: str,
     output_summary: str,
-    prompt_template: str
+    prompt_template: str,
 ) -> tuple[str, int, int]:
     """同期的に評価を実行"""
     full_prompt = build_evaluation_prompt(
@@ -193,12 +219,13 @@ def _run_sync_evaluation(
         input_text,
         current_prescription,
         additional_info,
-        output_summary
+        output_summary,
     )
 
-    model_name = settings.gemini_evaluation_model
+    provider, model_name, _ = _resolve_evaluation_model()
+    assert provider is not None
     assert model_name is not None
-    client = GeminiAPIClient(model_name=model_name)
+    client = create_client(provider)
     client.initialize()
 
     evaluation_text, input_tokens, output_tokens = client._generate_content(
@@ -233,7 +260,9 @@ async def execute_evaluation_stream(
     additional_info = sanitize_medical_text(additional_info or "")
     output_summary = sanitize_medical_text(output_summary)
 
-    prompt_template, error_msg = _validate_and_get_prompt(output_summary, document_type, input_text)
+    prompt_template, error_msg = _validate_and_get_prompt(
+        output_summary, document_type, input_text
+    )
     if error_msg:
         log_audit_event(
             event_type=get_message("AUDIT", "EVALUATION_FAILURE"),
@@ -242,10 +271,7 @@ async def execute_evaluation_stream(
             success=False,
             error_message=error_msg,
         )
-        yield sse_event("error", {
-            "success": False,
-            "error_message": error_msg
-        })
+        yield sse_event("error", {"success": False, "error_message": error_msg})
         return
 
     start_time = time.time()
@@ -253,8 +279,12 @@ async def execute_evaluation_stream(
     async for item in stream_with_heartbeat(
         sync_func=_run_sync_evaluation,
         sync_func_args=(
-            document_type, input_text, current_prescription,
-            additional_info, output_summary, prompt_template
+            document_type,
+            input_text,
+            current_prescription,
+            additional_info,
+            output_summary,
+            prompt_template,
         ),
         start_message=MESSAGES["STATUS"]["EVALUATION_START"],
         running_status="evaluating",
@@ -276,10 +306,13 @@ async def execute_evaluation_stream(
                 processing_time=processing_time,
             )
 
-            yield sse_event("complete", {
-                "success": True,
-                "evaluation_result": evaluation_text,
-                "input_tokens": input_tokens,
-                "output_tokens": output_tokens,
-                "processing_time": processing_time,
-            })
+            yield sse_event(
+                "complete",
+                {
+                    "success": True,
+                    "evaluation_result": evaluation_text,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "processing_time": processing_time,
+                },
+            )

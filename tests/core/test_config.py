@@ -209,7 +209,9 @@ class TestSettingsEdgeCases:
         settings = Settings()
 
         assert settings.aws_access_key_id == "AKIAIOSFODNN7EXAMPLE"
-        assert settings.aws_secret_access_key == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        assert (
+            settings.aws_secret_access_key == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        )
         assert settings.aws_region == "ap-northeast-1"
 
     @patch.dict(
@@ -246,7 +248,7 @@ class TestSettingsEdgeCases:
         {
             "PROMPT_MANAGEMENT": "false",
             "APP_TYPE": "summary",
-            "SELECTED_AI_MODEL": "Gemini_Pro",
+            "SELECTED_AI_MODEL": "Gemini",
         },
         clear=True,
     )
@@ -256,7 +258,7 @@ class TestSettingsEdgeCases:
 
         assert settings.prompt_management is False
         assert settings.app_type == "summary"
-        assert settings.selected_ai_model == "Gemini_Pro"
+        assert settings.selected_ai_model == "Gemini"
 
     @patch.dict(os.environ, {}, clear=True)
     def test_settings_application_config_defaults(self):
@@ -323,4 +325,7 @@ class TestSettingsValidation:
                 Settings()
 
             # Pydantic ValidationError が発生
-            assert "validation error" in str(exc_info.value).lower() or "bool" in str(exc_info.value).lower()
+            assert (
+                "validation error" in str(exc_info.value).lower()
+                or "bool" in str(exc_info.value).lower()
+            )

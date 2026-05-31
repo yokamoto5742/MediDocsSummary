@@ -43,6 +43,7 @@ class TestBase:
     def test_base_is_declarative(self):
         """`Base` が SQLAlchemy の DeclarativeBase を継承していること"""
         from sqlalchemy.orm import DeclarativeBase
+
         assert issubclass(Base, DeclarativeBase)
 
     def test_all_models_share_same_metadata(self):
@@ -82,7 +83,11 @@ class TestPromptModel:
         inspector = inspect(db_engine)
         indexes = inspector.get_indexes("prompts")
         lookup_index = next(i for i in indexes if i["name"] == "ix_prompts_lookup")
-        assert set(lookup_index["column_names"]) == {"department", "document_type", "doctor"}
+        assert set(lookup_index["column_names"]) == {
+            "department",
+            "document_type",
+            "doctor",
+        }
 
     def test_create_prompt(self, db):
         """Prompt の作成・取得"""
@@ -116,12 +121,21 @@ class TestPromptModel:
         db.add(prompt)
         db.flush()
 
-        fetched = db.query(Prompt).filter_by(department="default", document_type="返書").first()
+        fetched = (
+            db.query(Prompt)
+            .filter_by(department="default", document_type="返書")
+            .first()
+        )
         assert fetched.is_default is False
 
     def test_selected_model_nullable(self, db):
         """selected_model は NULL 許容"""
-        prompt = Prompt(department="内科", doctor="default", document_type="退院時サマリ", content="内科プロンプト")
+        prompt = Prompt(
+            department="内科",
+            doctor="default",
+            document_type="退院時サマリ",
+            content="内科プロンプト",
+        )
         db.add(prompt)
         db.flush()
 
@@ -144,9 +158,24 @@ class TestPromptModel:
     def test_multiple_prompts_same_department(self, db):
         """同一診療科で複数プロンプト登録可能（異なる医師・文書タイプ）"""
         prompts = [
-            Prompt(department="循環器内科", doctor="default", document_type="他院への紹介", content="A"),
-            Prompt(department="循環器内科", doctor="山田太郎", document_type="他院への紹介", content="B"),
-            Prompt(department="循環器内科", doctor="default", document_type="返書", content="C"),
+            Prompt(
+                department="循環器内科",
+                doctor="default",
+                document_type="他院への紹介",
+                content="A",
+            ),
+            Prompt(
+                department="循環器内科",
+                doctor="山田太郎",
+                document_type="他院への紹介",
+                content="B",
+            ),
+            Prompt(
+                department="循環器内科",
+                doctor="default",
+                document_type="返書",
+                content="C",
+            ),
         ]
         for p in prompts:
             db.add(p)
@@ -194,7 +223,11 @@ class TestEvaluationPromptModel:
         db.add(ep)
         db.flush()
 
-        fetched = db.query(EvaluationPrompt).filter_by(document_type="他院への紹介_評価").first()
+        fetched = (
+            db.query(EvaluationPrompt)
+            .filter_by(document_type="他院への紹介_評価")
+            .first()
+        )
         assert fetched is not None
         assert fetched.content == "評価用プロンプト内容"
         assert fetched.is_active is True
@@ -208,7 +241,9 @@ class TestEvaluationPromptModel:
         db.add(ep)
         db.flush()
 
-        fetched = db.query(EvaluationPrompt).filter_by(document_type="返書_評価2").first()
+        fetched = (
+            db.query(EvaluationPrompt).filter_by(document_type="返書_評価2").first()
+        )
         assert fetched.is_active is True
 
     def test_inactive_evaluation_prompt(self, db):
@@ -221,7 +256,11 @@ class TestEvaluationPromptModel:
         db.add(ep)
         db.flush()
 
-        fetched = db.query(EvaluationPrompt).filter_by(document_type="非アクティブ評価").first()
+        fetched = (
+            db.query(EvaluationPrompt)
+            .filter_by(document_type="非アクティブ評価")
+            .first()
+        )
         assert fetched.is_active is False
 
 
@@ -239,7 +278,7 @@ class TestSummaryUsageModel:
         assert "date" in columns
         assert "app_type" in columns
         assert "document_types" in columns  # DBカラム名
-        assert "model_detail" in columns    # DBカラム名
+        assert "model_detail" in columns  # DBカラム名
         assert "department" in columns
         assert "doctor" in columns
         assert "input_tokens" in columns
@@ -296,7 +335,7 @@ class TestSummaryUsageModel:
             department="default",
             doctor="default",
             document_type="返書",
-            model="Gemini_Pro",
+            model="Gemini",
         )
         db.add(usage)
         db.flush()
