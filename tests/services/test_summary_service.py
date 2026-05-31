@@ -212,24 +212,12 @@ class TestGetProviderAndModel:
     @patch("app.services.model_selector.settings")
     def test_get_provider_and_model_claude(self, mock_settings):
         """プロバイダーとモデル取得 - Claude"""
-        mock_settings.claude_model = "claude-3-5-sonnet-20241022"
-        mock_settings.anthropic_model = None
+        mock_settings.anthropic_model = "claude-3-5-sonnet-20241022"
 
         provider, model = get_provider_and_model("Claude")
 
         assert provider == "claude"
         assert model == "claude-3-5-sonnet-20241022"
-
-    @patch("app.services.model_selector.settings")
-    def test_get_provider_and_model_claude_anthropic_fallback(self, mock_settings):
-        """プロバイダーとモデル取得 - Claude（anthropic_modelフォールバック）"""
-        mock_settings.claude_model = None
-        mock_settings.anthropic_model = "claude-3-opus-20240229"
-
-        provider, model = get_provider_and_model("Claude")
-
-        assert provider == "claude"
-        assert model == "claude-3-opus-20240229"
 
     @patch("app.services.model_selector.settings")
     def test_get_provider_and_model_gemini(self, mock_settings):
@@ -250,8 +238,7 @@ class TestGetProviderAndModel:
 
     @patch("app.services.model_selector.settings")
     def test_get_provider_and_model_claude_model_not_set(self, mock_settings):
-        """プロバイダーとモデル取得 - Claude設定が両方ともNone"""
-        mock_settings.claude_model = None
+        """プロバイダーとモデル取得 - anthropic_model未設定"""
         mock_settings.anthropic_model = None
 
         with pytest.raises(ValueError):
