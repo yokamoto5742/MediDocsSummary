@@ -51,9 +51,7 @@ class ClaudeAPIClient(BaseAPIClient):
             response = self.client.messages.create(
                 model=model_name,
                 max_tokens=6000,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "user", "content": prompt}],
             )
 
             summary_text = MESSAGES["ERROR"]["EMPTY_RESPONSE"]
