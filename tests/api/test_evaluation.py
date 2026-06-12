@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import status
 
+from app.core.constants import MESSAGES
 from app.schemas.evaluation import EvaluationResponse
 
 
@@ -321,7 +322,8 @@ def test_evaluate_output_missing_required_field(client, test_db, csrf_headers):
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert "input_text" in response.text.lower()
+    # 検証エラーの詳細はクライアントに返さず定型メッセージを返す
+    assert response.json()["error_message"] == MESSAGES["ERROR"]["INPUT_ERROR"]
 
 
 def test_save_evaluation_prompt_missing_required_field(client, test_db, csrf_headers):
@@ -336,7 +338,8 @@ def test_save_evaluation_prompt_missing_required_field(client, test_db, csrf_hea
     )
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert "content" in response.text.lower()
+    # 検証エラーの詳細はクライアントに返さず定型メッセージを返す
+    assert response.json()["error_message"] == MESSAGES["ERROR"]["INPUT_ERROR"]
 
 
 def test_evaluate_output_stream_success(client, test_db, csrf_headers):

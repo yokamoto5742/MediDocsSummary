@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 from fastapi import status
 
+from app.core.constants import MESSAGES
 from app.schemas.summary import SummaryResponse
 
 
@@ -163,7 +164,8 @@ def test_generate_summary_missing_required_field(client, test_db, csrf_headers):
     response = client.post("/api/summary/generate", json=payload, headers=csrf_headers)
 
     assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-    assert "medical_text" in response.text.lower()
+    # 検証エラーの詳細はクライアントに返さず定型メッセージを返す
+    assert response.json()["error_message"] == MESSAGES["ERROR"]["INPUT_ERROR"]
 
 
 def test_generate_summary_all_optional_fields(

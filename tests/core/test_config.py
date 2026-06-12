@@ -279,6 +279,19 @@ class TestSettingsEdgeCases:
 class TestSettingsValidation:
     """Settings バリデーションのテスト"""
 
+    @patch.dict(os.environ, {"CSRF_SECRET_KEY": ""}, clear=True)
+    def test_get_settings_missing_csrf_secret_key_raises(self):
+        """CSRF_SECRET_KEY 未設定なら get_settings が RuntimeError"""
+        with pytest.raises(RuntimeError, match="CSRF_SECRET_KEY"):
+            get_settings()
+
+    @patch.dict(os.environ, {"CSRF_SECRET_KEY": "valid-secret-key"}, clear=True)
+    def test_get_settings_with_csrf_secret_key(self):
+        """CSRF_SECRET_KEY 設定済みなら正常に取得できる"""
+        settings = get_settings()
+
+        assert settings.csrf_secret_key == "valid-secret-key"
+
     @patch.dict(
         os.environ,
         {

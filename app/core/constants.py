@@ -45,7 +45,6 @@ MESSAGES: dict[str, dict[str, str]] = {
         "CLAUDE_CLIENT_NOT_INITIALIZED": "Claude API クライアントが初期化されていません",
         "COPY_FAILED": "テキストのコピーに失敗しました",
         "EMPTY_RESPONSE": "レスポンスが空です",
-        "EVALUATION_API_ERROR": "評価中にエラーが発生しました: {error}",
         "EVALUATION_ERROR": "評価中にエラーが発生しました",
         "EVALUATION_PROMPT_DELETE_FAILED": "評価プロンプトの削除に失敗しました",
         "EVALUATION_PROMPT_LOAD_FAILED": "評価プロンプトの読み込みに失敗しました",
