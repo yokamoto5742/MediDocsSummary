@@ -7,6 +7,24 @@
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-06-14
+
+### 変更
+
+- **設定管理の一本化**: `claude_model` を削除し、`anthropic_model` に統一。設定構造をシンプル化し、プロバイダー設定をより明確に
+- **Claude APIメッセージ処理**: メッセージリストのフォーマットを簡略化し、APIクライアントの効率性を向上
+- **依存関係更新**: 外部ライブラリを最新バージョンに更新
+
+### 削除
+
+- **不要な設定項目**: 設定ファイルから使用されていない項目を削除
+- **セキュリティ関連ドキュメント**: セキュリティ改善実装に伴い、旧ドキュメントを削除
+
+### セキュリティ
+
+- **例外メッセージの秘匿**: エラーメッセージで秘密情報を隠す実装を追加し、エラーレスポンスのセキュリティを向上
+- **秘密鍵の早期検証**: 秘密鍵設定をアプリケーション起動時に検証し、設定エラーを早期に検出
+
 ## [1.1.0] - 2026-05-31
 
 ### 追加
@@ -113,8 +131,9 @@
 - **README ドキュメント**: 不要な設定項目を削除し、ドキュメント品質を改善
 - **依存関係**: requirements.txt を更新し、最新のライブラリバージョンに対応
 
-[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.4...HEAD
-[1.0.4]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.3...v1.0.4
+[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.0...v1.0.1
