@@ -1,5 +1,6 @@
 """データベース層のテスト（インメモリ SQLite 使用、本番DBは触らない）"""
 
+import json
 from collections.abc import Generator
 from typing import cast
 from unittest.mock import MagicMock, patch
@@ -32,6 +33,7 @@ class TestGetDb:
         """`get_db` はセッションを yield すること"""
         with patch("app.core.database._SessionLocal", sqlite_session_factory):
             from app.core.database import get_db
+
             gen = get_db()
             session = next(gen)
             assert session is not None
@@ -50,6 +52,7 @@ class TestGetDb:
 
         with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db
+
             gen = get_db()
             next(gen)
             try:
@@ -66,6 +69,7 @@ class TestGetDb:
 
         with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db
+
             gen = cast(Generator, get_db())
             next(gen)
             try:
@@ -83,6 +87,7 @@ class TestGetDbSession:
         """`get_db_session` はセッションを yield すること"""
         with patch("app.core.database._SessionLocal", sqlite_session_factory):
             from app.core.database import get_db_session
+
             with get_db_session() as session:
                 assert session is not None
                 result = session.execute(text("SELECT 1"))
@@ -95,6 +100,7 @@ class TestGetDbSession:
 
         with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
+
             with get_db_session():
                 pass
 
@@ -109,6 +115,7 @@ class TestGetDbSession:
 
         with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
+
             with pytest.raises(ValueError, match="テストエラー"):
                 with get_db_session():
                     raise ValueError("テストエラー")
@@ -121,6 +128,7 @@ class TestGetDbSession:
 
             with patch("app.core.database._SessionLocal", mock_factory):
                 from app.core.database import get_db_session
+
                 try:
                     with get_db_session():
                         if raise_error:
@@ -137,6 +145,7 @@ class TestGetDbSession:
 
         with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
+
             with pytest.raises(ValueError, match="DB書き込みエラー"):
                 with get_db_session():
                     raise ValueError("DB書き込みエラー")
@@ -148,6 +157,7 @@ class TestGetDbSession:
 
         with patch("app.core.database._SessionLocal", mock_factory):
             from app.core.database import get_db_session
+
             try:
                 with get_db_session():
                     raise Exception("エラー")
@@ -178,7 +188,11 @@ class TestGetDbSession:
             # 別セッションで読み込み確認
             verify_session = sqlite_session_factory()
             try:
-                fetched = verify_session.query(Prompt).filter_by(department="テスト科").first()
+                fetched = (
+                    verify_session.query(Prompt)
+                    .filter_by(department="テスト科")
+                    .first()
+                )
                 assert fetched is not None
                 assert fetched.content == "テストコンテンツ"
             finally:
@@ -207,7 +221,62 @@ class TestGetDbSession:
             # データが存在しないこと
             verify_session = sqlite_session_factory()
             try:
-                fetched = verify_session.query(Prompt).filter_by(department="ロールバック科").first()
+                fetched = (
+                    verify_session.query(Prompt)
+                    .filter_by(department="ロールバック科")
+                    .first()
+                )
                 assert fetched is None
             finally:
                 verify_session.close()
+
+
+class TestRotatingCredentials:
+    """`_RotatingCredentials` の短TTLキャッシュのテスト"""
+
+    def _build(self, secret_values, ttl_seconds=300):
+        """モックの Secrets Manager クライアントで `_RotatingCredentials` を生成する"""
+        mock_client = MagicMock()
+        mock_client.get_secret_value.return_value = {
+            "SecretString": json.dumps(secret_values)
+        }
+        with patch("app.core.database.boto3.client", return_value=mock_client):
+            from app.core.database import _RotatingCredentials
+
+            creds = _RotatingCredentials("rds!db-test", "ap-northeast-1", ttl_seconds)
+        return creds, mock_client
+
+    def test_get_returns_parsed_credentials(self):
+        """`get` は SecretString を username/password にパースして返すこと"""
+        creds, _ = self._build({"username": "user1", "password": "pass1"})
+        assert creds.get() == {"username": "user1", "password": "pass1"}
+
+    def test_caches_within_ttl(self):
+        """TTL 内はキャッシュを返し再取得しないこと"""
+        creds, mock_client = self._build({"username": "user1", "password": "pass1"})
+        with patch("app.core.database.time.monotonic", side_effect=[0.0, 100.0]):
+            creds.get()
+            creds.get()
+        assert mock_client.get_secret_value.call_count == 1
+
+    def test_force_refresh_refetches(self):
+        """`force_refresh=True` でキャッシュを破棄し最新を再取得すること"""
+        creds, mock_client = self._build({"username": "user1", "password": "pass1"})
+        mock_client.get_secret_value.side_effect = [
+            {"SecretString": json.dumps({"username": "user1", "password": "old"})},
+            {"SecretString": json.dumps({"username": "user1", "password": "new"})},
+        ]
+        with patch("app.core.database.time.monotonic", side_effect=[0.0, 10.0]):
+            first = creds.get()
+            second = creds.get(force_refresh=True)
+        assert first["password"] == "old"
+        assert second["password"] == "new"
+        assert mock_client.get_secret_value.call_count == 2
+
+    def test_refetches_after_ttl_expiry(self):
+        """TTL 期限切れ後は再取得すること"""
+        creds, mock_client = self._build({"username": "user1", "password": "pass1"})
+        with patch("app.core.database.time.monotonic", side_effect=[0.0, 300.0]):
+            creds.get()
+            creds.get()
+        assert mock_client.get_secret_value.call_count == 2
