@@ -1,5 +1,5 @@
 import json
-from typing import Generator, Tuple, Union
+from typing import Generator, Optional, Tuple, Union
 
 from google import genai
 from google.genai import types
@@ -63,24 +63,31 @@ class GeminiAPIClient(BaseAPIClient):
         except Exception as e:
             raise APIError(MESSAGES["ERROR"]["VERTEX_AI_INIT_ERROR"].format(error=str(e)))
 
-    def _generate_content(self, prompt: str, model_name: str) -> Tuple[str, int, int]:
+    def _build_generation_config(
+        self, system_prompt: Optional[str]
+    ) -> types.GenerateContentConfig:
+        """thinking設定とsystem promptから生成設定を構築"""
+        thinking_level = (
+            types.ThinkingLevel.LOW
+            if self.settings.gemini_thinking_level == "LOW"
+            else types.ThinkingLevel.HIGH
+        )
+        return types.GenerateContentConfig(
+            thinking_config=types.ThinkingConfig(thinking_level=thinking_level),
+            system_instruction=system_prompt,
+        )
+
+    def _generate_content(
+        self, prompt: str, model_name: str, system_prompt: Optional[str] = None
+    ) -> Tuple[str, int, int]:
         try:
             if self.client is None:
                 raise APIError(MESSAGES["ERROR"]["GEMINI_CLIENT_NOT_INITIALIZED"])
 
-            thinking_level = (
-                types.ThinkingLevel.LOW
-                if self.settings.gemini_thinking_level == "LOW"
-                else types.ThinkingLevel.HIGH
-            )
             response = self.client.models.generate_content(
                 model=model_name,
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(
-                        thinking_level=thinking_level
-                    )
-                )
+                config=self._build_generation_config(system_prompt),
             )
 
             result_text = ""
@@ -104,27 +111,17 @@ class GeminiAPIClient(BaseAPIClient):
             raise APIError(MESSAGES["ERROR"]["VERTEX_AI_API_ERROR"].format(error=str(e)))
 
     def _generate_content_stream(
-        self, prompt: str, model_name: str
+        self, prompt: str, model_name: str, system_prompt: Optional[str] = None
     ) -> Generator[Union[str, dict], None, None]:
         """ストリーミングでコンテンツを生成"""
         try:
             if self.client is None:
                 raise APIError(MESSAGES["ERROR"]["GEMINI_CLIENT_NOT_INITIALIZED"])
 
-            thinking_level = (
-                types.ThinkingLevel.LOW
-                if self.settings.gemini_thinking_level == "LOW"
-                else types.ThinkingLevel.HIGH
-            )
-
             response_stream = self.client.models.generate_content_stream(
                 model=model_name,
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(
-                        thinking_level=thinking_level
-                    )
-                )
+                config=self._build_generation_config(system_prompt),
             )
 
             input_tokens = 0

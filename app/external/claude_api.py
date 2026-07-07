@@ -1,11 +1,11 @@
 import logging
-from typing import Tuple
+from typing import Any, Optional, Tuple
 
 from anthropic import AnthropicBedrock
 from anthropic.types import TextBlock
 
 from app.core.config import get_settings
-from app.core.constants import MESSAGES
+from app.core.constants import CLAUDE_GENERATION_TEMPERATURE, MESSAGES
 from app.external.base_api import BaseAPIClient
 from app.utils.exceptions import APIError
 
@@ -33,12 +33,15 @@ class ClaudeAPIClient(BaseAPIClient):
         except Exception as e:
             raise APIError(MESSAGES["ERROR"]["BEDROCK_INIT_ERROR"].format(error=str(e)))
 
-    def _generate_content(self, prompt: str, model_name: str) -> Tuple[str, int, int]:
+    def _generate_content(
+        self, prompt: str, model_name: str, system_prompt: Optional[str] = None
+    ) -> Tuple[str, int, int]:
         """
         プロンプトから要約を生成
         Args:
-            prompt: 生成用プロンプト
+            prompt: ユーザーメッセージ（カルテ等のデータ）
             model_name: 使用するモデル名
+            system_prompt: system prompt（指示テンプレート）
         Returns:
             Tuple[str, int, int]: (生成された要約, 入力トークン数, 出力トークン数)
         Raises:
@@ -48,11 +51,16 @@ class ClaudeAPIClient(BaseAPIClient):
             if self.client is None:
                 raise APIError(MESSAGES["ERROR"]["CLAUDE_CLIENT_NOT_INITIALIZED"])
 
-            response = self.client.messages.create(
-                model=model_name,
-                max_tokens=6000,
-                messages=[{"role": "user", "content": prompt}],
-            )
+            request_params: dict[str, Any] = {
+                "model": model_name,
+                "max_tokens": 6000,
+                "temperature": CLAUDE_GENERATION_TEMPERATURE,
+                "messages": [{"role": "user", "content": prompt}],
+            }
+            if system_prompt:
+                request_params["system"] = system_prompt
+
+            response = self.client.messages.create(**request_params)
 
             summary_text = MESSAGES["ERROR"]["EMPTY_RESPONSE"]
             if response.content:
@@ -60,6 +68,10 @@ class ClaudeAPIClient(BaseAPIClient):
                     if isinstance(content_block, TextBlock):
                         summary_text = content_block.text
                         break
+
+            # 出力がmax_tokensに達した場合は途中切れの可能性を警告
+            if response.stop_reason == "max_tokens":
+                summary_text += f"\n\n{MESSAGES['WARNING']['OUTPUT_TRUNCATED']}"
 
             input_tokens = response.usage.input_tokens
             output_tokens = response.usage.output_tokens

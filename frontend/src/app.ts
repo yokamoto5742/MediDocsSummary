@@ -37,9 +37,11 @@ interface AppState {
     startTimer(): void;
     stopTimer(): void;
     generateSummary(): Promise<void>;
+    refineSummary(): Promise<void>;
+    runGeneration(extraBody: Record<string, string>): Promise<void>;
     processSSEStream(response: Response): Promise<void>;
     handleSSEEvent(eventText: string): void;
-    generateSummaryFallback(): Promise<void>;
+    generateSummaryFallback(extraBody: Record<string, string>): Promise<void>;
     clearForm(): void;
     backToInput(): void;
     backToOutput(): void;
@@ -179,6 +181,23 @@ export function appState(): AppState {
                 return;
             }
 
+            await this.runGeneration({});
+        },
+
+        // 評価の指摘を反映して再生成
+        async refineSummary() {
+            if (!this.result.outputSummary || !this.evaluationResult.result) {
+                this.error = window.MESSAGES?.VALIDATION?.EVALUATION_NO_OUTPUT ?? '評価対象の出力がありません';
+                return;
+            }
+
+            await this.runGeneration({
+                previous_summary: this.result.outputSummary,
+                evaluation_feedback: this.evaluationResult.result
+            });
+        },
+
+        async runGeneration(extraBody: Record<string, string>) {
             this.isGenerating = true;
             this.error = null;
             this.startTimer();
@@ -195,13 +214,14 @@ export function appState(): AppState {
                         doctor: this.settings.doctor,
                         document_type: this.settings.documentType,
                         model: this.settings.model,
-                        model_explicitly_selected: true
+                        model_explicitly_selected: true,
+                        ...extraBody
                     })
                 });
 
                 if (!response.ok) {
                     console.warn(`SSEストリーミングエンドポイントが利用不可 (status: ${response.status})、非ストリーミングにフォールバック`);
-                    await this.generateSummaryFallback();
+                    await this.generateSummaryFallback(extraBody);
                     return;
                 }
 
@@ -211,7 +231,7 @@ export function appState(): AppState {
                 console.error('SSEストリーミング中にエラーが発生:', e);
                 // ネットワークエラー時は非ストリーミングにフォールバック
                 try {
-                    await this.generateSummaryFallback();
+                    await this.generateSummaryFallback(extraBody);
                 } catch (fallbackError) {
                     console.error('フォールバックも失敗:', fallbackError);
                     this.error = window.MESSAGES?.ERROR?.API_ERROR ?? 'API エラーが発生しました';
@@ -302,7 +322,7 @@ export function appState(): AppState {
             }
         },
 
-        async generateSummaryFallback() {
+        async generateSummaryFallback(extraBody: Record<string, string>) {
             const response = await fetch('/api/summary/generate', {
                 method: 'POST',
                 headers: getHeaders({ 'Content-Type': 'application/json' }),
@@ -314,7 +334,8 @@ export function appState(): AppState {
                     doctor: this.settings.doctor,
                     document_type: this.settings.documentType,
                     model: this.settings.model,
-                    model_explicitly_selected: true
+                    model_explicitly_selected: true,
+                    ...extraBody
                 })
             });
 

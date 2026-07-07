@@ -6,7 +6,20 @@
     <!-- ボタン -->
     <div class="mb-6 flex gap-4">
         {{ m.primary_button("コピー", click="copyToClipboard(evaluationResult.result)") }}
+        {{ m.success_button("指摘を反映して再生成", "isGenerating", "再生成中...", "refineSummary()") }}
         {{ m.secondary_button("出力結果に戻る", "backToOutput()") }}
+    </div>
+
+    <!-- 再生成中の時間表示 -->
+    <template x-if="isGenerating">
+    <div class="mb-4 text-base text-white">
+        作成時間: <span x-text="elapsedTime"></span>秒
+    </div>
+    </template>
+
+    <!-- エラー表示（評価画面） -->
+    <div class="mb-4">
+        {{ m.error_alert() }}
     </div>
 
     <!-- 評価結果表示 -->

@@ -25,6 +25,33 @@ DEFAULT_DOCUMENT_TYPE = "退院時サマリ"
 DEFAULT_SUMMARY_PROMPT = """
 以下のカルテ情報を要約してください。これまでの治療内容を記載してください。
 """
+# app/external/claude_api.py 医療文書のため事実性・再現性を優先
+CLAUDE_GENERATION_TEMPERATURE = 0.2
+# app/external/base_api.py system promptに常時付加するgrounding指示
+GROUNDING_INSTRUCTION = """
+【厳守事項】
+- カルテに記載のない情報を追加しないでください
+- カルテの記載日時に沿って時系列で整理してください
+"""
+# app/external/base_api.py カルテ情報がJSON形式の場合にsystem promptへ追加する指示
+KARTE_JSON_INSTRUCTION = """
+【カルテ情報の形式】
+- <カルテ情報>はJSON形式です
+- 日時フィールドをもとに時系列を把握してください
+- JSONのキー名をそのまま文書に転記しないでください
+"""
+# app/external/base_api.py 評価の指摘を反映して再生成する際にsystem promptへ追加する指示
+REFINEMENT_INSTRUCTION = """
+【修正指示】
+- <前回の生成結果>に対する<評価結果>の指摘を反映し、文書を再生成してください
+- 指摘のない箇所は前回の生成結果を維持してください
+"""
+# app/services/evaluation_service.py 評価プロンプトに常時付加する根拠引用指示
+EVALUATION_GROUNDING_INSTRUCTION = """
+【評価の厳守事項】
+- 各指摘には根拠となるカルテの該当箇所を引用してください
+- カルテに根拠のない記述は、ハルシネーションの可能性として必ず指摘してください
+"""
 # app/utils/text_processor.py
 # 【治療経過】: 内容 など(改行含む)
 # 治療経過: 内容 など(改行含む)
@@ -106,6 +133,9 @@ MESSAGES: dict[str, dict[str, str]] = {
         "PROMPT_DELETED": "プロンプトを削除しました",
         "PROMPT_SAVED": "プロンプトを保存しました",
         "PROMPT_UPDATED": "プロンプトを更新しました",
+    },
+    "WARNING": {
+        "OUTPUT_TRUNCATED": "※出力が上限に達したため、文書が途中で切れている可能性があります",
     },
     "STATUS": {
         "DOCUMENT_GENERATING": "文書を生成中...",
