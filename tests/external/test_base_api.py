@@ -24,7 +24,7 @@ class MockAPIClient(BaseAPIClient):
         self.initialized = True
         return True
 
-    def _generate_content(self, _prompt: str, _model_name: str, _system_prompt=None) -> tuple:  # type: ignore[override]
+    def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:  # type: ignore[override]
         """コンテンツ生成をシミュレート"""
         return "生成されたテキスト", 1000, 500
 
@@ -459,7 +459,7 @@ class TestGenerateSummary:
         """文書生成 - コンテンツ生成失敗"""
 
         class FailingGenerateClient(MockAPIClient):
-            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt=None) -> tuple:
+            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:
                 raise Exception("生成エラー")
 
         mock_db = MagicMock()
@@ -482,7 +482,7 @@ class TestGenerateSummary:
         """文書生成 - APIError の伝播"""
 
         class APIErrorClient(MockAPIClient):
-            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt=None) -> tuple:
+            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:
                 raise APIError("API呼び出しエラー")
 
         mock_db = MagicMock()
@@ -524,7 +524,7 @@ class TestBaseAPIClientAbstractMethods:
         """サブクラスは initialize を実装する必要がある"""
 
         class IncompleteClient(BaseAPIClient):
-            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt=None) -> tuple:  # type: ignore[override]
+            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:  # type: ignore[override]
                 return "text", 100, 50
 
         with pytest.raises(TypeError):

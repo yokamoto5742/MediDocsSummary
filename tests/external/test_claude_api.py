@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from anthropic import omit  # type: ignore[attr-defined]
 from anthropic.types import TextBlock
 
 from app.core.constants import CLAUDE_GENERATION_TEMPERATURE, MESSAGES
@@ -205,8 +206,9 @@ class TestClaudeAPIClientGenerateContent:
         mock_client.messages.create.assert_called_once_with(
             model="claude-3-5-sonnet-20241022",
             max_tokens=6000,
-            temperature=CLAUDE_GENERATION_TEMPERATURE,
+            system=omit,
             messages=[{"role": "user", "content": "テストプロンプト"}],
+            extra_body={"temperature": CLAUDE_GENERATION_TEMPERATURE},
         )
 
     @patch("app.external.claude_api.get_settings")
@@ -298,7 +300,7 @@ class TestClaudeAPIClientGenerateContent:
 
     @patch("app.external.claude_api.get_settings")
     def test_generate_content_temperature(self, mock_get_settings):
-        """_generate_content - temperature が設定される"""
+        """_generate_content - temperature が extra_body で送信される"""
         mock_get_settings.return_value = create_mock_settings()
 
         mock_client = MagicMock()
@@ -312,7 +314,10 @@ class TestClaudeAPIClientGenerateContent:
         client._generate_content(prompt="プロンプト", model_name="test-model")
 
         call_args = mock_client.messages.create.call_args
-        assert call_args[1]["temperature"] == CLAUDE_GENERATION_TEMPERATURE
+        assert "temperature" not in call_args[1]
+        assert call_args[1]["extra_body"] == {
+            "temperature": CLAUDE_GENERATION_TEMPERATURE
+        }
 
     @patch("app.external.claude_api.get_settings")
     def test_generate_content_with_system_prompt(self, mock_get_settings):
@@ -351,7 +356,7 @@ class TestClaudeAPIClientGenerateContent:
         client._generate_content(prompt="プロンプト", model_name="test-model")
 
         call_args = mock_client.messages.create.call_args
-        assert "system" not in call_args[1]
+        assert call_args[1]["system"] is omit
 
     @patch("app.external.claude_api.get_settings")
     def test_generate_content_truncated_output_warning(self, mock_get_settings):

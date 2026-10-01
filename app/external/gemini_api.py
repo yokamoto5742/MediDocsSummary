@@ -97,7 +97,8 @@ class GeminiAPIClient(BaseAPIClient):
                 raise APIError(MESSAGES["ERROR"]["GEMINI_UNEXPECTED_RESPONSE"])
 
             input_tokens, output_tokens = _token_counts(interaction.usage)
-            return interaction.output_text or "", input_tokens, output_tokens
+            summary_text = interaction.output_text or MESSAGES["ERROR"]["EMPTY_RESPONSE"]
+            return summary_text, input_tokens, output_tokens
         except Exception as e:
             raise APIError(MESSAGES["ERROR"]["VERTEX_AI_API_ERROR"].format(error=str(e)))
 
@@ -112,13 +113,18 @@ class GeminiAPIClient(BaseAPIClient):
 
             input_tokens = 0
             output_tokens = 0
+            has_text = False
 
             for event in event_stream:
                 if isinstance(event, interactions.StepDelta):
                     if isinstance(event.delta, interactions.TextDelta) and event.delta.text:
+                        has_text = True
                         yield event.delta.text
                 elif isinstance(event, interactions.InteractionCompletedEvent):
                     input_tokens, output_tokens = _token_counts(event.interaction.usage)
+
+            if not has_text:
+                yield MESSAGES["ERROR"]["EMPTY_RESPONSE"]
 
             yield {"input_tokens": input_tokens, "output_tokens": output_tokens}
 
