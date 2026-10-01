@@ -9,42 +9,35 @@ from app.core.constants import (
     REFINEMENT_INSTRUCTION,
 )
 from app.external.base_api import BaseAPIClient, _is_json_text
+from app.schemas.summary import SummaryRequest
 from app.utils.exceptions import APIError
 
 
 class MockAPIClient(BaseAPIClient):
-    """テスト用のモックAPIクライアント"""
+    """テスト用のモックAPIクライアント（_generate_content の呼び出しを記録する）"""
 
-    def __init__(self, api_key: str = "test_key", default_model: str = "test_model"):
-        super().__init__(api_key, default_model)
-        self.initialized = False
+    def __init__(self, error: Exception | None = None):
+        self.error = error
+        self.calls: list[tuple[str, str, str]] = []
 
-    def initialize(self) -> bool:
-        """初期化をシミュレート"""
-        self.initialized = True
-        return True
-
-    def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:  # type: ignore[override]
-        """コンテンツ生成をシミュレート"""
+    def _generate_content(
+        self, prompt: str, model_name: str, system_prompt: str = ""
+    ) -> tuple[str, int, int]:
+        self.calls.append((prompt, model_name, system_prompt))
+        if self.error:
+            raise self.error
         return "生成されたテキスト", 1000, 500
 
 
-class TestBaseAPIClientInitialization:
-    """BaseAPIClient 初期化のテスト"""
-
-    def test_init_with_api_key_and_model(self):
-        """初期化 - APIキーとデフォルトモデル指定"""
-        client = MockAPIClient(api_key="test_api_key", default_model="test-model-v1")
-
-        assert client.api_key == "test_api_key"
-        assert client.default_model == "test-model-v1"
-
-    def test_init_default_values(self):
-        """初期化 - デフォルト値"""
-        client = MockAPIClient()
-
-        assert client.api_key == "test_key"
-        assert client.default_model == "test_model"
+@pytest.fixture
+def mock_get_prompt():
+    """DBアクセスを差し替え、get_prompt のモックを返す（既定ではプロンプト未登録）"""
+    with (
+        patch("app.external.base_api.get_db_session") as mock_db_session,
+        patch("app.external.base_api.get_prompt", return_value=None) as mock,
+    ):
+        mock_db_session.return_value.__enter__.return_value = MagicMock()
+        yield mock
 
 
 class TestIsJsonText:
@@ -71,40 +64,32 @@ class TestIsJsonText:
 class TestCreateSummaryPrompt:
     """create_summary_prompt メソッドのテスト"""
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_minimal(self, mock_db_session, mock_get_prompt):
-        """プロンプト生成 - 最小パラメータ"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
+    def test_minimal(self, mock_get_prompt):
+        """プロンプト生成 - カルテ情報のみ"""
+        system_prompt, user_message = MockAPIClient().create_summary_prompt(
+            SummaryRequest(medical_text="患者情報")
+        )
 
-        client = MockAPIClient()
-        system_prompt, user_message = client.create_summary_prompt(medical_text="患者情報")
-
+        # プロンプト未登録ならDEFAULT_SUMMARY_PROMPTを使用
         assert "以下のカルテ情報を要約してください" in system_prompt
         assert GROUNDING_INSTRUCTION in system_prompt
         assert "<カルテ情報>" in user_message
         assert "患者情報" in user_message
-        # 空の追加情報はuserメッセージに含まれない
+        # 空のオプションフィールドはuserメッセージに含まれない
+        assert "<現在の処方>" not in user_message
         assert "<追加情報>" not in user_message
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_all_params(self, mock_db_session, mock_get_prompt):
-        """プロンプト生成 - 全パラメータ"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        system_prompt, user_message = client.create_summary_prompt(
-            medical_text="カルテデータ",
-            additional_info="追加データ",
-            current_prescription="処方内容",
-            department="眼科",
-            document_type="他院への紹介",
-            doctor="橋本義弘",
+    def test_all_fields(self, mock_get_prompt):
+        """プロンプト生成 - 全フィールド指定"""
+        system_prompt, user_message = MockAPIClient().create_summary_prompt(
+            SummaryRequest(
+                medical_text="カルテデータ",
+                additional_info="追加データ",
+                current_prescription="処方内容",
+                department="眼科",
+                document_type="他院への紹介",
+                doctor="橋本義弘",
+            )
         )
 
         assert "<カルテ情報>" in user_message
@@ -116,161 +101,80 @@ class TestCreateSummaryPrompt:
         # データはsystem promptに含まれない
         assert "カルテデータ" not in system_prompt
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_empty_optional_fields(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """プロンプト生成 - 空のオプションフィールド"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        _, user_message = client.create_summary_prompt(medical_text="データ")
-
-        assert "<カルテ情報>" in user_message
-        assert "データ" in user_message
-        assert "<現在の処方>" not in user_message
-        assert "<追加情報>" not in user_message
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_whitespace_optional_fields(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """プロンプト生成 - 空白のみのオプションフィールド"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        _, user_message = client.create_summary_prompt(
-            medical_text="データ",
-            additional_info="   ",
-            current_prescription="\t",
+    def test_whitespace_optional_fields(self, mock_get_prompt):
+        """プロンプト生成 - 空白のみのオプションフィールドは追加しない"""
+        _, user_message = MockAPIClient().create_summary_prompt(
+            SummaryRequest(
+                medical_text="データ", additional_info="   ", current_prescription="\t"
+            )
         )
 
-        # 空白のみは strip() で空文字列になるため、ユーザーデータは追加されない
         assert "<現在の処方>" not in user_message
         assert "<追加情報>" not in user_message
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_with_custom_prompt(self, mock_db_session, mock_get_prompt):
-        """プロンプト生成 - カスタムプロンプト使用"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
+    def test_custom_prompt(self, mock_get_prompt):
+        """プロンプト生成 - DBのカスタムプロンプトを使用"""
+        mock_get_prompt.return_value = MagicMock(content="カスタムプロンプトテンプレート")
 
-        mock_prompt = MagicMock()
-        mock_prompt.content = "カスタムプロンプトテンプレート"
-        mock_prompt.selected_model = "gemini-1.5-pro-002"
-        mock_get_prompt.return_value = mock_prompt
-
-        client = MockAPIClient()
-        system_prompt, user_message = client.create_summary_prompt(
-            medical_text="データ",
-            department="眼科",
-            document_type="他院への紹介",
-            doctor="橋本義弘",
+        system_prompt, user_message = MockAPIClient().create_summary_prompt(
+            SummaryRequest(
+                medical_text="データ",
+                department="眼科",
+                document_type="他院への紹介",
+                doctor="橋本義弘",
+            )
         )
 
         assert "カスタムプロンプトテンプレート" in system_prompt
-        assert "<カルテ情報>" in user_message
         assert "データ" in user_message
-
-        # get_prompt が呼ばれたことを確認
-        assert mock_get_prompt.called
-        call_args = mock_get_prompt.call_args[0]
         # 第1引数はdbセッション、第2-4引数はdepartment, document_type, doctor
-        assert call_args[1] == "眼科"
-        assert call_args[2] == "他院への紹介"
-        assert call_args[3] == "橋本義弘"
+        assert mock_get_prompt.call_args[0][1:] == ("眼科", "他院への紹介", "橋本義弘")
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_fallback_to_default(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """プロンプト生成 - デフォルトプロンプトへのフォールバック"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
+    def test_default_lookup_keys(self, mock_get_prompt):
+        """プロンプト生成 - 未指定時は default とデフォルト文書タイプで検索"""
+        MockAPIClient().create_summary_prompt(SummaryRequest(medical_text="データ"))
 
-        client = MockAPIClient()
-        system_prompt, user_message = client.create_summary_prompt(
-            medical_text="テスト", department="眼科", document_type="他院への紹介"
+        assert mock_get_prompt.call_args[0][1:] == (
+            "default",
+            DEFAULT_DOCUMENT_TYPE,
+            "default",
         )
 
-        # カスタムプロンプトがない場合はDEFAULT_SUMMARY_PROMPTを使用
+    def test_db_error_falls_back_to_default_prompt(self):
+        """プロンプト生成 - DB取得に失敗してもデフォルトプロンプトで続行"""
+        with patch(
+            "app.external.base_api.get_db_session", side_effect=Exception("DB error")
+        ):
+            system_prompt, _ = MockAPIClient().create_summary_prompt(
+                SummaryRequest(medical_text="データ")
+            )
+
         assert "以下のカルテ情報を要約してください" in system_prompt
-        assert "<カルテ情報>" in user_message
-        assert "テスト" in user_message
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_default_document_type(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """プロンプト生成 - デフォルト文書タイプ使用"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        _, user_message = client.create_summary_prompt(medical_text="データ")
-
-        # get_promptが呼ばれ、DEFAULT_DOCUMENT_TYPEで呼ばれることを確認
-        assert mock_get_prompt.called
-        call_args = mock_get_prompt.call_args[0]
-        assert call_args[1] == "default"
-        assert call_args[2] == DEFAULT_DOCUMENT_TYPE
-        assert call_args[3] == "default"
-        # 生成されたuserメッセージにカルテ情報が含まれることを確認
-        assert "<カルテ情報>" in user_message
-        assert "データ" in user_message
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_json_karte(self, mock_db_session, mock_get_prompt):
+    def test_json_karte(self, mock_get_prompt):
         """プロンプト生成 - JSON形式カルテでJSON指示が付加される"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        system_prompt, _ = client.create_summary_prompt(
-            medical_text='{"記載日": "2026-07-01", "所見": "良好"}'
+        system_prompt, _ = MockAPIClient().create_summary_prompt(
+            SummaryRequest(medical_text='{"記載日": "2026-07-01", "所見": "良好"}')
         )
 
         assert KARTE_JSON_INSTRUCTION in system_prompt
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_non_json_karte(self, mock_db_session, mock_get_prompt):
+    def test_non_json_karte(self, mock_get_prompt):
         """プロンプト生成 - 通常テキストではJSON指示が付加されない"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        system_prompt, _ = client.create_summary_prompt(medical_text="通常のカルテ記載")
+        system_prompt, _ = MockAPIClient().create_summary_prompt(
+            SummaryRequest(medical_text="通常のカルテ記載")
+        )
 
         assert KARTE_JSON_INSTRUCTION not in system_prompt
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_refinement(self, mock_db_session, mock_get_prompt):
+    def test_refinement(self, mock_get_prompt):
         """プロンプト生成 - 前回結果と評価結果の両方指定で再生成モード"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        system_prompt, user_message = client.create_summary_prompt(
-            medical_text="カルテ",
-            previous_summary="前回のサマリ",
-            evaluation_feedback="指摘事項",
+        system_prompt, user_message = MockAPIClient().create_summary_prompt(
+            SummaryRequest(
+                medical_text="カルテ",
+                previous_summary="前回のサマリ",
+                evaluation_feedback="指摘事項",
+            )
         )
 
         assert REFINEMENT_INSTRUCTION in system_prompt
@@ -279,318 +183,100 @@ class TestCreateSummaryPrompt:
         assert "<評価結果>" in user_message
         assert "指摘事項" in user_message
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_refinement_requires_both(
-        self, mock_db_session, mock_get_prompt
-    ):
+    def test_refinement_requires_both(self, mock_get_prompt):
         """プロンプト生成 - 片方のみ指定では再生成モードにならない"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        system_prompt, user_message = client.create_summary_prompt(
-            medical_text="カルテ",
-            previous_summary="前回のサマリ",
+        system_prompt, user_message = MockAPIClient().create_summary_prompt(
+            SummaryRequest(medical_text="カルテ", previous_summary="前回のサマリ")
         )
 
         assert REFINEMENT_INSTRUCTION not in system_prompt
         assert "<前回の生成結果>" not in user_message
 
-
-class TestGetModelName:
-    """get_model_name メソッドのテスト"""
-
-    @patch("app.external.base_api.get_selected_model")
-    @patch("app.external.base_api.get_db_session")
-    def test_get_model_name_from_prompt(self, mock_db_session, mock_get_selected_model):
-        """モデル名取得 - プロンプトから"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-
-        # get_selected_model がモデル名を返す
-        mock_get_selected_model.return_value = "gemini-1.5-pro-002"
-
-        client = MockAPIClient(default_model="claude-3-5-sonnet-20241022")
-        model_name = client.get_model_name(
-            department="眼科",
-            document_type="他院への紹介",
-            doctor="橋本義弘",
+    def test_special_characters(self, mock_get_prompt):
+        """プロンプト生成 - 特殊文字をそのまま含める"""
+        special_text = "患者: <test>, \"引用\", '単一引用符', \n改行, \tタブ"
+        _, user_message = MockAPIClient().create_summary_prompt(
+            SummaryRequest(medical_text=special_text)
         )
 
-        assert model_name == "gemini-1.5-pro-002"
+        assert special_text in user_message
 
-    @patch("app.external.base_api.get_selected_model")
-    @patch("app.external.base_api.get_db_session")
-    def test_get_model_name_default_fallback(self, mock_db_session, mock_get_selected_model):
-        """モデル名取得 - デフォルトへのフォールバック"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        # get_selected_model がNoneを返す（プロンプトが見つからない場合）
-        mock_get_selected_model.return_value = None
 
-        client = MockAPIClient(default_model="claude-3-5-sonnet-20241022")
-        model_name = client.get_model_name(
-            department="default",
-            document_type="他院への紹介",
-            doctor="default",
-        )
+class TestGenerate:
+    """generate メソッドのテスト"""
 
-        assert model_name == "claude-3-5-sonnet-20241022"
+    def test_passes_prompts_and_model_to_subclass(self):
+        """system prompt・userメッセージ・モデル名をサブクラスの実装に渡す"""
+        client = MockAPIClient()
 
-    @patch("app.external.base_api.get_selected_model")
-    @patch("app.external.base_api.get_db_session")
-    def test_get_model_name_no_selected_model_in_prompt(self, mock_db_session, mock_get_selected_model):
-        """モデル名取得 - プロンプトにselected_modelがない"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
+        result = client.generate("システム指示", "ユーザーデータ", "test-model")
 
-        # get_selected_model がNoneを返す（selected_modelがない場合）
-        mock_get_selected_model.return_value = None
+        assert result == ("生成されたテキスト", 1000, 500)
+        assert client.calls == [("ユーザーデータ", "test-model", "システム指示")]
 
-        client = MockAPIClient(default_model="default-model")
-        model_name = client.get_model_name(
-            department="眼科",
-            document_type="返書",
-            doctor="default",
-        )
+    def test_sdk_exception_is_wrapped_once(self):
+        """SDKの例外はクライアント名付きのAPIErrorに変換し、元の例外を原因として保持する"""
+        original = ConnectionError("接続失敗")
+        client = MockAPIClient(error=original)
 
-        # selected_model がない場合はデフォルトを使用
-        assert model_name == "default-model"
+        with pytest.raises(APIError) as exc_info:
+            client.generate("システム指示", "ユーザーデータ", "test-model")
 
-    @patch("app.external.base_api.get_selected_model")
-    @patch("app.external.base_api.get_db_session")
-    def test_get_model_name_empty_selected_model(self, mock_db_session, mock_get_selected_model):
-        """モデル名取得 - selected_modelが空"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
+        assert "MockAPIClientでエラーが発生しました" in str(exc_info.value)
+        assert "接続失敗" in str(exc_info.value)
+        assert exc_info.value.__cause__ is original
 
-        # get_selected_model は空文字列の場合 None を返す（prompt_service.pyの実装）
-        mock_get_selected_model.return_value = None
+    def test_api_error_propagates_unchanged(self):
+        """サブクラスが送出したAPIErrorは再ラップしない"""
+        original = APIError("レスポンスが空です")
+        client = MockAPIClient(error=original)
 
-        client = MockAPIClient(default_model="default-model")
-        model_name = client.get_model_name(
-            department="default",
-            document_type="他院への紹介",
-            doctor="default",
-        )
+        with pytest.raises(APIError) as exc_info:
+            client.generate("システム指示", "ユーザーデータ", "test-model")
 
-        # selected_model が空文字列の場合はget_selected_modelがNoneを返し、デフォルトモデルが使用される
-        assert model_name == "default-model"
+        assert exc_info.value is original
 
 
 class TestGenerateSummary:
     """generate_summary メソッドのテスト"""
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_generate_summary_success(self, mock_db_session, mock_get_prompt):
-        """文書生成 - 正常系"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
+    def test_builds_prompt_and_generates(self, mock_get_prompt):
+        """リクエストからプロンプトを組み立て、指定モデルで生成する"""
         client = MockAPIClient()
-        result = client.generate_summary(medical_text="患者情報", additional_info="追加情報",
-                                         current_prescription="処方",
-                                         document_type="他院への紹介")
 
-        assert result == ("生成されたテキスト", 1000, 500)
-        assert client.initialized is True
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_generate_summary_with_model_name(self, mock_db_session, mock_get_prompt):
-        """文書生成 - model_name 指定"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
         result = client.generate_summary(
-            medical_text="データ",
-            model_name="specified-model",
+            SummaryRequest(medical_text="テストカルテ", additional_info="追加情報"),
+            "custom-model",
         )
 
         assert result == ("生成されたテキスト", 1000, 500)
+        user_message, model_name, system_prompt = client.calls[0]
+        assert "テストカルテ" in user_message
+        assert "追加情報" in user_message
+        assert model_name == "custom-model"
+        assert GROUNDING_INSTRUCTION in system_prompt
 
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_generate_summary_without_model_name(self, mock_db_session, mock_get_prompt):
-        """文書生成 - model_name なし（デフォルト使用）"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
+    def test_generation_failure_raises_api_error(self, mock_get_prompt):
+        """生成に失敗した場合はAPIErrorになる"""
+        client = MockAPIClient(error=Exception("API呼び出しエラー"))
 
-        mock_prompt = MagicMock()
-        mock_prompt.content = "プロンプト"
-        mock_prompt.selected_model = "gemini-1.5-pro-002"
-        mock_get_prompt.return_value = mock_prompt
-
-        client = MockAPIClient(default_model="default-model")
-        result = client.generate_summary(
-            medical_text="データ",
-            department="眼科",
-            document_type="他院への紹介",
-            doctor="橋本義弘",
-        )
-
-        assert result == ("生成されたテキスト", 1000, 500)
-
-    def test_generate_summary_initialize_failure(self):
-        """文書生成 - 初期化失敗"""
-
-        class FailingInitClient(MockAPIClient):
-            def initialize(self) -> bool:
-                raise APIError("初期化エラー")
-
-        client = FailingInitClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.generate_summary(medical_text="データ")
-
-        assert "初期化エラー" in str(exc_info.value)
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_generate_summary_generate_content_failure(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """文書生成 - コンテンツ生成失敗"""
-
-        class FailingGenerateClient(MockAPIClient):
-            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:
-                raise Exception("生成エラー")
-
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = FailingGenerateClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.generate_summary(medical_text="データ")
-
-        assert "FailingGenerateClient" in str(exc_info.value)
-        assert "生成エラー" in str(exc_info.value)
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_generate_summary_api_error_propagation(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """文書生成 - APIError の伝播"""
-
-        class APIErrorClient(MockAPIClient):
-            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:
-                raise APIError("API呼び出しエラー")
-
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = APIErrorClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.generate_summary(medical_text="データ")
-
-        # APIError はそのまま伝播される
-        assert "API呼び出しエラー" in str(exc_info.value)
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_generate_summary_minimal_params(self, mock_db_session, mock_get_prompt):
-        """文書生成 - 最小パラメータ"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        client = MockAPIClient()
-        result = client.generate_summary(medical_text="最小データ")
-
-        assert result == ("生成されたテキスト", 1000, 500)
-        assert client.initialized is True
+        with pytest.raises(APIError):
+            client.generate_summary(SummaryRequest(medical_text="データ"), "test-model")
 
 
 class TestBaseAPIClientAbstractMethods:
-    """BaseAPIClient 抽象メソッドのテスト"""
+    """BaseAPIClient の抽象メソッドのテスト"""
 
     def test_cannot_instantiate_base_class(self):
-        """BaseAPIClient を直接インスタンス化できない"""
+        """基底クラスは直接インスタンス化できない"""
         with pytest.raises(TypeError):
-            BaseAPIClient(api_key="test", default_model="test")  # type: ignore
-
-    def test_subclass_must_implement_initialize(self):
-        """サブクラスは initialize を実装する必要がある"""
-
-        class IncompleteClient(BaseAPIClient):
-            def _generate_content(self, _prompt: str, _model_name: str, _system_prompt: str = "") -> tuple:  # type: ignore[override]
-                return "text", 100, 50
-
-        with pytest.raises(TypeError):
-            IncompleteClient(api_key="test", default_model="test")  # type: ignore
+            BaseAPIClient()  # type: ignore
 
     def test_subclass_must_implement_generate_content(self):
         """サブクラスは _generate_content を実装する必要がある"""
 
         class IncompleteClient(BaseAPIClient):
-            def initialize(self) -> bool:
-                return True
+            pass
 
         with pytest.raises(TypeError):
-            IncompleteClient(api_key="test", default_model="test")  # type: ignore
-
-
-class TestBaseAPIClientEdgeCases:
-    """BaseAPIClient のエッジケース"""
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_very_long_medical_text(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """プロンプト生成 - 非常に長いカルテ情報"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        long_text = "あ" * 100000
-        client = MockAPIClient()
-        system_prompt, user_message = client.create_summary_prompt(medical_text=long_text)
-
-        assert "以下のカルテ情報を要約してください" in system_prompt
-        assert long_text in user_message
-
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    def test_create_summary_prompt_special_characters(
-        self, mock_db_session, mock_get_prompt
-    ):
-        """プロンプト生成 - 特殊文字を含むテキスト"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        special_text = "特殊文字: \n\t\r\n!@#$%^&*(){}[]<>?/\\|`~"
-        client = MockAPIClient()
-        _, user_message = client.create_summary_prompt(medical_text=special_text)
-
-        assert special_text in user_message
-
-    @patch("app.external.base_api.get_selected_model")
-    @patch("app.external.base_api.get_db_session")
-    def test_get_model_name_with_none_prompt(self, mock_db_session, mock_get_selected_model):
-        """モデル名取得 - get_selected_model が None を返す"""
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        # get_selected_model がNoneを返す（プロンプトが見つからない場合）
-        mock_get_selected_model.return_value = None
-
-        client = MockAPIClient(default_model="fallback-model")
-        model_name = client.get_model_name(
-            department="default",
-            document_type="他院への紹介",
-            doctor="default",
-        )
-
-        assert model_name == "fallback-model"
+            IncompleteClient()  # type: ignore

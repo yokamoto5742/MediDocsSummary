@@ -1,9 +1,15 @@
+import asyncio
 import json
+import time
 
 import pytest
 
-from app.core.constants import MESSAGES
-from app.services.sse_helpers import sse_event, stream_with_heartbeat
+from app.services.sse_helpers import (
+    heartbeat_until_done,
+    sse_error_event,
+    sse_event,
+    sse_response,
+)
 
 
 class TestSseEvent:
@@ -44,59 +50,81 @@ class TestSseEvent:
         assert parsed["success"] is True
         assert parsed["input_tokens"] == 1000
 
+    def test_sse_error_event(self):
+        """errorイベント生成 - success=False とメッセージを含む"""
+        result = sse_error_event("失敗しました")
 
-class TestStreamWithHeartbeat:
-    """stream_with_heartbeat 関数のテスト"""
+        assert result.startswith("event: error\n")
+        parsed = json.loads(result.split("data: ")[1].strip())
+        assert parsed == {"success": False, "error_message": "失敗しました"}
 
-    @pytest.mark.asyncio
-    async def test_stream_with_heartbeat_success(self):
-        """ハートビート付きストリーミング - 正常系"""
 
-        def sync_task(a: int, b: int) -> tuple[str, int, int]:
-            return "結果", a, b
+class TestSseResponse:
+    """sse_response 関数のテスト"""
 
-        items = []
-        async for item in stream_with_heartbeat(
-            sync_func=sync_task,
-            sync_func_args=(100, 50),
-            start_message="開始",
-            running_status="processing",
-            running_message="処理中",
-            elapsed_message_template="処理中... {elapsed}秒",
-        ):
-            items.append(item)
+    async def test_sse_response_headers(self):
+        """SSE用のメディアタイプとバッファリング無効化ヘッダーを設定する"""
 
-        # progress(starting) + progress(processing) + result
-        assert len(items) >= 3
-        assert "event: progress" in items[0]
-        assert "開始" in items[0]
-        assert "event: progress" in items[1]
-        assert "処理中" in items[1]
-        # 最後はresultタプル
-        assert items[-1] == ("結果", 100, 50)
+        async def events():
+            yield sse_event("progress", {})
 
-    @pytest.mark.asyncio
-    async def test_stream_with_heartbeat_error(self):
-        """ハートビート付きストリーミング - エラー"""
+        response = sse_response(events())
 
-        def sync_task() -> tuple[str, int, int]:
+        assert response.media_type == "text/event-stream"
+        assert response.headers["Cache-Control"] == "no-cache"
+        assert response.headers["X-Accel-Buffering"] == "no"
+
+
+class TestHeartbeatUntilDone:
+    """heartbeat_until_done 関数のテスト"""
+
+    async def _collect(self, task: asyncio.Future, heartbeat_interval: float = 5) -> list[str]:
+        return [
+            event
+            async for event in heartbeat_until_done(
+                task,
+                start_message="開始",
+                running_status="processing",
+                running_message="処理中",
+                elapsed_message_template="処理中... {elapsed}秒",
+                heartbeat_interval=heartbeat_interval,  # type: ignore[arg-type]
+            )
+        ]
+
+    async def test_yields_start_and_running_then_stops(self):
+        """開始・実行中の2イベントを出し、タスク完了で終了する"""
+        task = asyncio.create_task(asyncio.to_thread(lambda: ("結果", 100, 50)))
+
+        events = await self._collect(task)
+
+        assert len(events) == 2
+        assert all("event: progress" in event for event in events)
+        assert "開始" in events[0]
+        assert "処理中" in events[1]
+        # 結果はイベントに含めず、呼び出し側がタスクから受け取る
+        assert await task == ("結果", 100, 50)
+
+    async def test_yields_elapsed_events_while_running(self):
+        """タスク実行中はハートビート間隔ごとに経過イベントを出す"""
+        task = asyncio.create_task(asyncio.to_thread(time.sleep, 0.2))
+
+        events = await self._collect(task, heartbeat_interval=0.05)
+
+        assert len(events) > 2
+        assert "秒" in events[2]
+        assert task.done()
+
+    async def test_task_error_is_left_to_caller(self):
+        """タスクの例外はここで送出せず、errorイベントも出さない"""
+
+        def failing_task() -> None:
             raise ValueError("テストエラー")
 
-        items = []
-        async for item in stream_with_heartbeat(
-            sync_func=sync_task,
-            sync_func_args=(),
-            start_message="開始",
-            running_status="processing",
-            running_message="処理中",
-            elapsed_message_template="処理中... {elapsed}秒",
-        ):
-            items.append(item)
+        task = asyncio.create_task(asyncio.to_thread(failing_task))
 
-        # progressイベントとerrorイベント
-        assert any("event: error" in str(i) for i in items)
-        error_items = [i for i in items if isinstance(i, str) and "event: error" in i]
-        assert len(error_items) >= 1
-        # 例外詳細はクライアントに返さず定型メッセージを返す
-        assert MESSAGES["ERROR"]["API_ERROR"] in error_items[0]
-        assert "テストエラー" not in error_items[0]
+        events = await self._collect(task)
+
+        assert len(events) == 2
+        assert not any("event: error" in event for event in events)
+        with pytest.raises(ValueError, match="テストエラー"):
+            await task

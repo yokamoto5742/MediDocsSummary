@@ -6,34 +6,17 @@ from google.genai import interactions
 
 from app.core.constants import MESSAGES
 from app.external.gemini_api import GeminiAPIClient
+from app.schemas.summary import SummaryRequest
 from app.utils.exceptions import APIError
 
 
 def create_mock_settings(**kwargs):
     """テスト用の設定モックを作成"""
     mock = MagicMock()
-    mock.gemini_model = kwargs.get("gemini_model", "gemini-1.5-pro-002")
     mock.google_project_id = kwargs.get("google_project_id", "test-project")
     mock.google_location = kwargs.get("google_location", "global")
     mock.google_credentials_json = kwargs.get("google_credentials_json", None)
     mock.gemini_thinking_level = kwargs.get("gemini_thinking_level", "HIGH")
-    return mock
-
-
-def create_mock_usage(input_tokens, output_tokens):
-    """テスト用のUsageモックを作成"""
-    return MagicMock(
-        total_input_tokens=input_tokens, total_output_tokens=output_tokens
-    )
-
-
-def create_mock_interaction(text, input_tokens=None, output_tokens=None):
-    """テスト用のInteractionモックを作成（トークン数未指定時は usage なし）"""
-    mock = MagicMock(spec=interactions.Interaction)
-    mock.output_text = text
-    mock.usage = (
-        None if input_tokens is None else create_mock_usage(input_tokens, output_tokens)
-    )
     return mock
 
 
@@ -45,779 +28,294 @@ def create_mock_text_event(text):
     return mock
 
 
-class TestGeminiAPIClientInitialization:
-    """GeminiAPIClient 初期化のテスト"""
+def create_mock_completed_event(input_tokens=None, output_tokens=None, has_usage=True):
+    """テスト用の完了イベントモックを作成"""
+    mock = MagicMock(spec=interactions.InteractionCompletedEvent)
+    mock.interaction = MagicMock()
+    mock.interaction.usage = (
+        MagicMock(total_input_tokens=input_tokens, total_output_tokens=output_tokens)
+        if has_usage
+        else None
+    )
+    return mock
 
-    @patch("app.external.gemini_api.get_settings")
-    def test_init_with_default_model(self, mock_get_settings):
-        """初期化 - デフォルトモデル使用"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_model="gemini-1.5-pro-002"
-        )
 
+def make_client(events=None, **settings_kwargs):
+    """genai.Client を差し替えた GeminiAPIClient と interactions.create のモックを返す"""
+    with (
+        patch("app.external.gemini_api.get_settings") as mock_get_settings,
+        patch("app.external.gemini_api.genai.Client") as mock_genai_client,
+    ):
+        mock_get_settings.return_value = create_mock_settings(**settings_kwargs)
         client = GeminiAPIClient()
 
-        assert client.default_model == "gemini-1.5-pro-002"
-        assert client.client is None
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_init_with_custom_model(self, mock_get_settings):
-        """初期化 - カスタムモデル指定"""
-        mock_get_settings.return_value = create_mock_settings()
-
-        client = GeminiAPIClient(model_name="gemini-custom-model")
-
-        assert client.default_model == "gemini-custom-model"
-        assert client.client is None
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_init_without_gemini_model(self, mock_get_settings):
-        """初期化 - gemini_model なし"""
-        mock_get_settings.return_value = create_mock_settings(gemini_model=None)
-
-        client = GeminiAPIClient()
-
-        assert client.default_model is None
+    create = mock_genai_client.return_value.interactions.create
+    if events is not None:
+        create.return_value = iter(events)
+    return client, create
 
 
-class TestGeminiAPIClientInitialize:
-    """GeminiAPIClient initialize メソッドのテスト"""
+class TestGeminiAPIClientInit:
+    """GeminiAPIClient 生成時のテスト"""
 
     @patch("app.external.gemini_api.genai.Client")
     @patch(
         "app.external.gemini_api.service_account.Credentials.from_service_account_info"
     )
     @patch("app.external.gemini_api.get_settings")
-    def test_initialize_with_credentials_json_success(
+    def test_init_with_credentials_json(
         self, mock_get_settings, mock_from_service_account_info, mock_genai_client
     ):
-        """initialize - GOOGLE_CREDENTIALS_JSON を使用して成功"""
+        """GOOGLE_CREDENTIALS_JSON からサービスアカウント認証情報を作ってクライアントを生成"""
         credentials_dict = {
             "type": "service_account",
             "project_id": "test-project-123",
-            "private_key_id": "key123",
             "private_key": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
             "client_email": "test@test-project.iam.gserviceaccount.com",
-            "client_id": "123456789",
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
         }
-
         mock_get_settings.return_value = create_mock_settings(
             google_project_id="test-project-123",
             google_location="us-central1",
             google_credentials_json=json.dumps(credentials_dict),
         )
 
-        mock_credentials = MagicMock()
-        mock_from_service_account_info.return_value = mock_credentials
-
-        mock_client_instance = MagicMock()
-        mock_genai_client.return_value = mock_client_instance
-
         client = GeminiAPIClient()
-        result = client.initialize()
 
-        assert result is True
-        assert client.client is mock_client_instance
-
+        assert client.client is mock_genai_client.return_value
         mock_from_service_account_info.assert_called_once_with(
             credentials_dict,
             scopes=["https://www.googleapis.com/auth/cloud-platform"],
         )
-
         mock_genai_client.assert_called_once_with(
             vertexai=True,
             project="test-project-123",
             location="us-central1",
-            credentials=mock_credentials,
+            credentials=mock_from_service_account_info.return_value,
         )
 
+    @pytest.mark.parametrize("credentials_json", [None, ""])
     @patch("app.external.gemini_api.genai.Client")
     @patch("app.external.gemini_api.get_settings")
-    def test_initialize_without_credentials_json(
-        self, mock_get_settings, mock_genai_client
+    def test_init_without_credentials_json(
+        self, mock_get_settings, mock_genai_client, credentials_json
     ):
-        """initialize - GOOGLE_CREDENTIALS_JSON なし（デフォルト認証）"""
+        """認証情報JSONが未設定なら credentials=None でSDKの既定の認証に任せる"""
         mock_get_settings.return_value = create_mock_settings(
             google_project_id="test-project-456",
-            google_location="global",
-            google_credentials_json=None,
+            google_location="asia-northeast1",
+            google_credentials_json=credentials_json,
         )
 
-        mock_client_instance = MagicMock()
-        mock_genai_client.return_value = mock_client_instance
-
-        client = GeminiAPIClient()
-        result = client.initialize()
-
-        assert result is True
-        assert client.client is mock_client_instance
+        GeminiAPIClient()
 
         mock_genai_client.assert_called_once_with(
             vertexai=True,
             project="test-project-456",
-            location="global",
+            location="asia-northeast1",
+            credentials=None,
         )
 
+    @pytest.mark.parametrize("project_id", [None, ""])
     @patch("app.external.gemini_api.get_settings")
-    def test_initialize_missing_project_id(self, mock_get_settings):
-        """initialize - GOOGLE_PROJECT_ID 未設定"""
-        mock_get_settings.return_value = create_mock_settings(google_project_id=None)
+    def test_init_missing_project_id(self, mock_get_settings, project_id):
+        """GOOGLE_PROJECT_ID が未設定ならAPIError"""
+        mock_get_settings.return_value = create_mock_settings(google_project_id=project_id)
 
-        client = GeminiAPIClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.initialize()
-
-        assert str(exc_info.value) == MESSAGES["CONFIG"]["VERTEX_AI_PROJECT_MISSING"]
+        with pytest.raises(APIError, match="GOOGLE_PROJECT_ID"):
+            GeminiAPIClient()
 
     @patch("app.external.gemini_api.get_settings")
-    def test_initialize_invalid_json_format(self, mock_get_settings):
-        """initialize - 不正なJSON形式"""
+    def test_init_invalid_json_format(self, mock_get_settings):
+        """認証情報JSONが不正な形式ならAPIError"""
         mock_get_settings.return_value = create_mock_settings(
-            google_credentials_json="{ invalid json format"
+            google_credentials_json="{ invalid json }"
         )
 
-        client = GeminiAPIClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.initialize()
-
-        assert "認証情報JSONのパースに失敗しました" in str(exc_info.value)
+        with pytest.raises(APIError, match="認証情報JSONのパースに失敗しました"):
+            GeminiAPIClient()
 
     @patch(
         "app.external.gemini_api.service_account.Credentials.from_service_account_info"
     )
     @patch("app.external.gemini_api.get_settings")
-    def test_initialize_missing_credential_fields(
+    def test_init_missing_credential_fields(
         self, mock_get_settings, mock_from_service_account_info
     ):
-        """initialize - 認証情報フィールド不足"""
-        incomplete_credentials = {"type": "service_account"}
-
+        """認証情報に必須フィールドがなければAPIError"""
         mock_get_settings.return_value = create_mock_settings(
-            google_credentials_json=json.dumps(incomplete_credentials)
+            google_credentials_json=json.dumps({"type": "service_account"})
         )
-        mock_from_service_account_info.side_effect = KeyError("project_id")
+        mock_from_service_account_info.side_effect = KeyError("private_key")
 
-        client = GeminiAPIClient()
+        with pytest.raises(APIError, match="認証情報に必要なフィールドがありません"):
+            GeminiAPIClient()
 
-        with pytest.raises(APIError) as exc_info:
-            client.initialize()
+    @patch(
+        "app.external.gemini_api.service_account.Credentials.from_service_account_info"
+    )
+    @patch("app.external.gemini_api.get_settings")
+    def test_init_credentials_creation_error(
+        self, mock_get_settings, mock_from_service_account_info
+    ):
+        """認証情報の生成に失敗したらAPIError"""
+        mock_get_settings.return_value = create_mock_settings(
+            google_credentials_json=json.dumps({"type": "service_account"})
+        )
+        mock_from_service_account_info.side_effect = ValueError("不正な鍵")
 
-        assert "認証情報に必要なフィールドがありません" in str(exc_info.value)
+        with pytest.raises(APIError, match="認証情報の処理中にエラーが発生しました"):
+            GeminiAPIClient()
 
     @patch("app.external.gemini_api.genai.Client")
     @patch("app.external.gemini_api.get_settings")
-    def test_initialize_genai_client_error(self, mock_get_settings, mock_genai_client):
-        """initialize - genai.Client 作成エラー"""
-        mock_get_settings.return_value = create_mock_settings(
-            google_credentials_json=None
-        )
-        mock_genai_client.side_effect = Exception("API接続エラー")
+    def test_init_genai_client_error_propagates(self, mock_get_settings, mock_genai_client):
+        """genai.Client の生成失敗はそのまま送出する（呼び出し側が一括で処理する）"""
+        mock_get_settings.return_value = create_mock_settings()
+        mock_genai_client.side_effect = Exception("Vertex AI接続エラー")
 
-        client = GeminiAPIClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.initialize()
-
-        error_message = str(exc_info.value)
-        assert "Vertex AI初期化エラー" in error_message
-        assert "API接続エラー" in error_message
-
-    @patch(
-        "app.external.gemini_api.service_account.Credentials.from_service_account_info"
-    )
-    @patch("app.external.gemini_api.get_settings")
-    def test_initialize_credentials_creation_error(
-        self, mock_get_settings, mock_from_service_account_info
-    ):
-        """initialize - 認証情報作成エラー"""
-        credentials_dict = {"type": "service_account"}
-        mock_get_settings.return_value = create_mock_settings(
-            google_credentials_json=json.dumps(credentials_dict)
-        )
-        mock_from_service_account_info.side_effect = Exception("認証情報作成失敗")
-
-        client = GeminiAPIClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.initialize()
-
-        assert "認証情報の処理中にエラーが発生しました" in str(exc_info.value)
+        with pytest.raises(Exception, match="Vertex AI接続エラー"):
+            GeminiAPIClient()
 
 
 class TestGeminiAPIClientGenerateContent:
     """GeminiAPIClient _generate_content メソッドのテスト"""
 
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_success_with_low_thinking(self, mock_get_settings):
-        """_generate_content - 正常系（ThinkingLevel.LOW）"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("生成されたサマリー", 2000, 1000)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        result = client._generate_content(
-            prompt="テストプロンプト", model_name="gemini-1.5-pro-002"
-        )
-
-        assert result == ("生成されたサマリー", 2000, 1000)
-
-        call_args = mock_client.interactions.create.call_args
-        assert call_args[1]["model"] == "gemini-1.5-pro-002"
-        assert call_args[1]["input"] == "テストプロンプト"
-        assert call_args[1]["generation_config"] == {"thinking_level": "low"}
-        assert call_args[1]["store"] is False
-        assert "system_instruction" not in call_args[1]
-        assert "stream" not in call_args[1]
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_success_with_high_thinking(self, mock_get_settings):
-        """_generate_content - 正常系（ThinkingLevel.HIGH）"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="HIGH"
-        )
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("高品質サマリー", 3000, 1500)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        result = client._generate_content(
-            prompt="プロンプト", model_name="gemini-1.5-pro-002"
-        )
-
-        assert result == ("高品質サマリー", 3000, 1500)
-
-        call_args = mock_client.interactions.create.call_args
-        assert call_args[1]["generation_config"] == {"thinking_level": "high"}
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_unexpected_response(self, mock_get_settings):
-        """_generate_content - Interaction 以外のレスポンス"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_client.interactions.create.return_value = MagicMock()
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        with pytest.raises(APIError) as exc_info:
-            client._generate_content(prompt="プロンプト", model_name="test-model")
-
-        assert MESSAGES["ERROR"]["GEMINI_UNEXPECTED_RESPONSE"] in str(exc_info.value)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_no_usage(self, mock_get_settings):
-        """_generate_content - usage なし"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("サマリー")
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        result = client._generate_content(prompt="プロンプト", model_name="test-model")
-
-        assert result == ("サマリー", 0, 0)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_api_error(self, mock_get_settings):
-        """_generate_content - API呼び出しエラー"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_client.interactions.create.side_effect = Exception(
-            "Vertex AI APIエラー"
-        )
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        with pytest.raises(APIError) as exc_info:
-            client._generate_content(prompt="プロンプト", model_name="test-model")
-
-        error_message = str(exc_info.value)
-        assert "Vertex AI API呼び出しエラー" in error_message
-        assert "Vertex AI APIエラー" in error_message
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_client_not_initialized(self, mock_get_settings):
-        """_generate_content - クライアント未初期化"""
-        mock_get_settings.return_value = create_mock_settings()
-
-        client = GeminiAPIClient()
-        # client.client は None のまま
-
-        with pytest.raises(APIError) as exc_info:
-            client._generate_content(prompt="プロンプト", model_name="test-model")
-
-        assert "Gemini API クライアントが初期化されていません" in str(exc_info.value)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_with_system_prompt(self, mock_get_settings):
-        """_generate_content - system prompt が system_instruction として渡される"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("テキスト", 100, 50)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        client._generate_content(
-            prompt="カルテデータ", model_name="test-model", system_prompt="指示テンプレート"
-        )
-
-        call_args = mock_client.interactions.create.call_args
-        assert call_args[1]["system_instruction"] == "指示テンプレート"
-        assert call_args[1]["input"] == "カルテデータ"
-
-
-class TestGeminiAPIClientIntegration:
-    """GeminiAPIClient 統合テスト"""
-
-    @patch("app.external.gemini_api.genai.Client")
-    @patch("app.external.base_api.get_prompt")
-    @patch("app.external.base_api.get_db_session")
-    @patch("app.external.gemini_api.get_settings")
-    def test_full_generate_summary_flow(
-        self, mock_get_settings, mock_db_session, mock_get_prompt, mock_genai_client
-    ):
-        """完全な文書生成フロー"""
-        mock_get_settings.return_value = create_mock_settings(
-            google_project_id="test-project",
-            google_location="global",
-            gemini_model="gemini-1.5-pro-002",
-            gemini_thinking_level="HIGH",
-            google_credentials_json=None,
-        )
-
-        mock_db = MagicMock()
-        mock_db_session.return_value.__enter__.return_value = mock_db
-        mock_get_prompt.return_value = None
-
-        mock_client_instance = MagicMock()
-        mock_response = create_mock_interaction("生成された診療情報提供書", 3000, 1500)
-
-        mock_client_instance.interactions.create.return_value = mock_response
-        mock_genai_client.return_value = mock_client_instance
-
-        client = GeminiAPIClient()
-        result = client.generate_summary(
-            medical_text="患者情報",
-            additional_info="追加情報",
-            current_prescription="処方内容",
-            document_type="他院への紹介",
-            model_name="gemini-1.5-pro-002",
-        )
-
-        assert result == ("生成された診療情報提供書", 3000, 1500)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_summary_initialization_error(self, mock_get_settings):
-        """generate_summary - 初期化エラー"""
-        mock_get_settings.return_value = create_mock_settings(google_project_id=None)
-
-        client = GeminiAPIClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.generate_summary(medical_text="データ")
-
-        assert MESSAGES["CONFIG"]["VERTEX_AI_PROJECT_MISSING"] in str(exc_info.value)
-
-
-class TestGeminiAPIClientEdgeCases:
-    """GeminiAPIClient エッジケース"""
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_very_long_prompt(self, mock_get_settings):
-        """_generate_content - 非常に長いプロンプト"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("サマリー", 100000, 5000)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        long_prompt = "あ" * 200000
-        result = client._generate_content(prompt=long_prompt, model_name="test-model")
-
-        assert result == ("サマリー", 100000, 5000)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_special_characters(self, mock_get_settings):
-        """_generate_content - 特殊文字を含むプロンプト"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("結果", 100, 50)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        special_prompt = "特殊文字: \n\t\r\n!@#$%^&*(){}[]<>?/\\|`~"
-        result = client._generate_content(
-            prompt=special_prompt, model_name="test-model"
-        )
-
-        assert result[0] == "結果"
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_empty_prompt(self, mock_get_settings):
-        """_generate_content - 空のプロンプト"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_thinking_level="LOW"
-        )
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("空レスポンス", 0, 10)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-
-        result = client._generate_content(prompt="", model_name="test-model")
-
-        assert result == ("空レスポンス", 0, 10)
-
-    @patch("app.external.gemini_api.genai.Client")
-    @patch("app.external.gemini_api.get_settings")
-    def test_initialize_empty_project_id(self, mock_get_settings, mock_genai_client):
-        """initialize - 空の PROJECT_ID"""
-        mock_get_settings.return_value = create_mock_settings(google_project_id="")
-
-        client = GeminiAPIClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.initialize()
-
-        assert MESSAGES["CONFIG"]["VERTEX_AI_PROJECT_MISSING"] in str(exc_info.value)
-
-    @patch("app.external.gemini_api.genai.Client")
-    @patch("app.external.gemini_api.get_settings")
-    def test_initialize_empty_credentials_json(
-        self, mock_get_settings, mock_genai_client
-    ):
-        """initialize - 空の GOOGLE_CREDENTIALS_JSON"""
-        mock_get_settings.return_value = create_mock_settings(
-            google_project_id="test-project",
-            google_location="global",
-            google_credentials_json="",
-        )
-
-        mock_client_instance = MagicMock()
-        mock_genai_client.return_value = mock_client_instance
-
-        client = GeminiAPIClient()
-        result = client.initialize()
-
-        assert result is True
-        mock_genai_client.assert_called_once_with(
-            vertexai=True,
-            project="test-project",
-            location="global",
-        )
-
-
-class TestGeminiAPIClientEvaluationModel:
-    """評価用モデル指定のテスト"""
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_init_with_evaluation_model(self, mock_get_settings):
-        """初期化 - 評価用モデル指定"""
-        mock_get_settings.return_value = create_mock_settings(
-            gemini_model="gemini-1.5-pro-002",
-        )
-
-        client = GeminiAPIClient(model_name="gemini-eval-model")
-
-        assert client.default_model == "gemini-eval-model"
-
-    @patch("app.external.gemini_api.genai.Client")
-    @patch("app.external.gemini_api.get_settings")
-    def test_evaluation_flow(self, mock_get_settings, mock_genai_client):
-        """評価フローのテスト"""
-        mock_settings = create_mock_settings(
-            google_credentials_json=None, gemini_thinking_level="HIGH"
-        )
-        mock_get_settings.return_value = mock_settings
-
-        mock_client_instance = MagicMock()
-        mock_response = create_mock_interaction("評価結果", 500, 200)
-
-        mock_client_instance.interactions.create.return_value = mock_response
-        mock_genai_client.return_value = mock_client_instance
-
-        client = GeminiAPIClient(model_name="gemini-eval-model")
-        client.initialize()
-
-        result = client._generate_content(
-            prompt="評価プロンプト", model_name="gemini-eval-model"
-        )
-
-        assert result == ("評価結果", 500, 200)
-
-
-class TestGeminiAPIClientNetworkErrors:
-    """GeminiAPIClient ネットワークエラーシナリオのテスト"""
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_connection_timeout(self, mock_get_settings):
-        """接続タイムアウト時に APIError を発生させること"""
-        import socket
-
-        mock_get_settings.return_value = create_mock_settings()
-
-        mock_client = MagicMock()
-        mock_client.interactions.create.side_effect = socket.timeout(
-            "接続タイムアウト"
-        )
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
-
-        with pytest.raises(APIError) as exc_info:
-            client._generate_content(prompt="テストプロンプト", model_name="test-model")
-
-        assert "Vertex AI API呼び出しエラー" in str(exc_info.value)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_connection_reset(self, mock_get_settings):
-        """接続リセット時に APIError を発生させること"""
-        mock_get_settings.return_value = create_mock_settings()
-
-        mock_client = MagicMock()
-        mock_client.interactions.create.side_effect = ConnectionResetError(
-            "接続がリセットされました"
-        )
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
-
-        with pytest.raises(APIError) as exc_info:
-            client._generate_content(prompt="テストプロンプト", model_name="test-model")
-
-        assert "Vertex AI API呼び出しエラー" in str(exc_info.value)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_service_unavailable(self, mock_get_settings):
-        """503 Service Unavailable 相当エラー時に APIError を発生させること"""
-        mock_get_settings.return_value = create_mock_settings()
-
-        mock_client = MagicMock()
-        mock_client.interactions.create.side_effect = Exception(
-            "503 Service Unavailable"
-        )
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
-
-        with pytest.raises(APIError) as exc_info:
-            client._generate_content(prompt="テストプロンプト", model_name="test-model")
-
-        assert "Vertex AI API呼び出しエラー" in str(exc_info.value)
-        assert "503" in str(exc_info.value)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_stream_connection_timeout(self, mock_get_settings):
-        """ストリーム生成中のタイムアウト時に APIError を発生させること"""
-        import socket
-
-        mock_get_settings.return_value = create_mock_settings()
-
-        mock_client = MagicMock()
-        mock_client.interactions.create.side_effect = socket.timeout(
-            "ストリームタイムアウト"
-        )
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
-
-        with pytest.raises(APIError) as exc_info:
-            list(
-                client._generate_content_stream(
-                    prompt="テスト", model_name="test-model"
-                )
-            )
-
-        assert "Vertex AI API呼び出しエラー" in str(exc_info.value)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_stream_success(self, mock_get_settings):
-        """ストリーム生成でテキスト差分と最後にトークン数を返すこと"""
-        mock_get_settings.return_value = create_mock_settings()
-
-        completed_event = MagicMock(spec=interactions.InteractionCompletedEvent)
-        completed_event.interaction = create_mock_interaction("", 300, 120)
-
-        mock_client = MagicMock()
-        mock_client.interactions.create.return_value = iter(
+    def test_joins_stream_chunks_and_returns_token_counts(self):
+        """ストリームのテキスト差分を結合し、完了イベントのトークン数を返す"""
+        client, _ = make_client(
             [
                 create_mock_text_event("最初の"),
                 create_mock_text_event("チャンク"),
-                completed_event,
+                create_mock_completed_event(300, 120),
             ]
         )
 
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
+        result = client._generate_content(prompt="テスト", model_name="test-model")
 
-        chunks = list(
-            client._generate_content_stream(prompt="テスト", model_name="test-model")
+        assert result == ("最初のチャンク", 300, 120)
+
+    def test_request_parameters(self):
+        """モデル名・入力・ストリーミング・非保存を指定して呼び出す"""
+        client, create = make_client([create_mock_text_event("テキスト")])
+
+        client._generate_content(prompt="テストプロンプト", model_name="gemini-test")
+
+        call_kwargs = create.call_args[1]
+        assert call_kwargs["model"] == "gemini-test"
+        assert call_kwargs["input"] == "テストプロンプト"
+        assert call_kwargs["stream"] is True
+        # 患者情報を含むためサーバー側に保存しない
+        assert call_kwargs["store"] is False
+        assert "system_instruction" not in call_kwargs
+
+    @pytest.mark.parametrize(
+        ("setting", "expected"), [("LOW", "low"), ("HIGH", "high"), ("OTHER", "high")]
+    )
+    def test_thinking_level(self, setting, expected):
+        """GEMINI_THINKING_LEVEL が LOW のときだけ low、それ以外は high"""
+        client, create = make_client(
+            [create_mock_text_event("テキスト")], gemini_thinking_level=setting
         )
 
-        assert chunks == [
-            "最初の",
-            "チャンク",
-            {"input_tokens": 300, "output_tokens": 120},
-        ]
-        assert mock_client.interactions.create.call_args[1]["stream"] is True
+        client._generate_content(prompt="テスト", model_name="test-model")
 
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_stream_empty_response(self, mock_get_settings):
-        """ストリームにテキストが含まれない場合に EMPTY_RESPONSE を返すこと"""
-        mock_get_settings.return_value = create_mock_settings()
+        assert create.call_args[1]["generation_config"] == {"thinking_level": expected}
 
-        completed_event = MagicMock(spec=interactions.InteractionCompletedEvent)
-        completed_event.interaction = create_mock_interaction("", 300, 0)
+    def test_with_system_prompt(self):
+        """system promptが指定された場合は system_instruction に渡す"""
+        client, create = make_client([create_mock_text_event("テキスト")])
 
-        mock_client = MagicMock()
-        mock_client.interactions.create.return_value = iter([completed_event])
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
-
-        chunks = list(
-            client._generate_content_stream(prompt="テスト", model_name="test-model")
+        client._generate_content(
+            prompt="テスト", model_name="test-model", system_prompt="システム指示"
         )
 
-        assert chunks == [
-            MESSAGES["ERROR"]["EMPTY_RESPONSE"],
-            {"input_tokens": 300, "output_tokens": 0},
-        ]
+        assert create.call_args[1]["system_instruction"] == "システム指示"
 
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_stream_error_mid_stream(self, mock_get_settings):
-        """ストリーム途中でエラーが発生した場合に APIError を発生させること"""
-        mock_get_settings.return_value = create_mock_settings()
+    def test_ignores_non_text_events(self):
+        """テキスト差分以外のイベントは無視する"""
+        thought_event = MagicMock(spec=interactions.StepDelta)
+        thought_event.delta = MagicMock()  # TextDeltaではない差分
+        client, _ = make_client(
+            [thought_event, MagicMock(), create_mock_text_event("本文")]
+        )
+
+        text, _, _ = client._generate_content(prompt="テスト", model_name="test-model")
+
+        assert text == "本文"
+
+    def test_no_usage_returns_zero_tokens(self):
+        """usage がない・トークン数が None の場合は 0 を返す"""
+        for completed_event in (
+            create_mock_completed_event(has_usage=False),
+            create_mock_completed_event(None, None),
+        ):
+            client, _ = make_client([create_mock_text_event("テキスト"), completed_event])
+
+            result = client._generate_content(prompt="テスト", model_name="test-model")
+
+            assert result == ("テキスト", 0, 0)
+
+    def test_empty_response_raises_api_error(self):
+        """テキストを含まないレスポンスは生成結果として扱わずAPIErrorにする"""
+        client, _ = make_client([create_mock_completed_event(300, 0)])
+
+        with pytest.raises(APIError, match=MESSAGES["ERROR"]["EMPTY_RESPONSE"]):
+            client._generate_content(prompt="テスト", model_name="test-model")
+
+
+class TestGeminiAPIClientGenerate:
+    """GeminiAPIClient の公開メソッド経由のテスト"""
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            TimeoutError("接続タイムアウト"),
+            ConnectionResetError("接続がリセットされました"),
+            Exception("503 Service Unavailable"),
+        ],
+    )
+    def test_sdk_error_is_wrapped_as_api_error(self, error):
+        """SDKの例外は generate でAPIErrorに変換される"""
+        client, create = make_client()
+        create.side_effect = error
+
+        with pytest.raises(APIError) as exc_info:
+            client.generate("システム指示", "プロンプト", "test-model")
+
+        assert "GeminiAPIClientでエラーが発生しました" in str(exc_info.value)
+        assert str(error) in str(exc_info.value)
+
+    def test_error_mid_stream_is_wrapped_as_api_error(self):
+        """ストリーム途中の切断もAPIErrorに変換される"""
 
         def error_generator():
             yield create_mock_text_event("最初のチャンク")
             raise ConnectionError("ストリーム途中で切断")
 
-        mock_client = MagicMock()
-        mock_client.interactions.create.return_value = error_generator()
+        client, create = make_client()
+        create.return_value = error_generator()
 
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
+        with pytest.raises(APIError, match="ストリーム途中で切断"):
+            client.generate("システム指示", "プロンプト", "test-model")
 
-        with pytest.raises(APIError) as exc_info:
-            list(
-                client._generate_content_stream(
-                    prompt="テスト", model_name="test-model"
-                )
+    def test_full_generate_summary_flow(self):
+        """generate_summary - プロンプト生成からAPI呼び出しまで"""
+        client, create = make_client(
+            [create_mock_text_event("生成された文書"), create_mock_completed_event(2500, 1200)]
+        )
+
+        with (
+            patch("app.external.base_api.get_db_session") as mock_db_session,
+            patch("app.external.base_api.get_prompt", return_value=None),
+        ):
+            mock_db_session.return_value.__enter__.return_value = MagicMock()
+            result = client.generate_summary(
+                SummaryRequest(medical_text="テストカルテ", additional_info="追加情報"),
+                "gemini-1.5-pro-002",
             )
 
-        assert "Vertex AI API呼び出しエラー" in str(exc_info.value)
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_null_text_response(self, mock_get_settings):
-        """output_text が None の場合に EMPTY_RESPONSE を返すこと"""
-        mock_get_settings.return_value = create_mock_settings()
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction(None)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
-
-        result_text, input_tokens, output_tokens = client._generate_content(
-            prompt="テスト", model_name="test-model"
-        )
-
-        assert result_text == MESSAGES["ERROR"]["EMPTY_RESPONSE"]
-        assert input_tokens == 0
-        assert output_tokens == 0
-
-    @patch("app.external.gemini_api.get_settings")
-    def test_generate_content_usage_token_counts_none(self, mock_get_settings):
-        """usage のトークン数が None の場合にトークン数 0 を返すこと"""
-        mock_get_settings.return_value = create_mock_settings()
-
-        mock_client = MagicMock()
-        mock_response = create_mock_interaction("レスポンステキスト")
-        mock_response.usage = create_mock_usage(None, None)
-
-        mock_client.interactions.create.return_value = mock_response
-
-        client = GeminiAPIClient()
-        client.client = mock_client
-        client.settings = mock_get_settings.return_value
-
-        result_text, input_tokens, output_tokens = client._generate_content(
-            prompt="テスト", model_name="test-model"
-        )
-
-        assert result_text == "レスポンステキスト"
-        assert input_tokens == 0
-        assert output_tokens == 0
-
-    @patch("app.external.gemini_api.genai.Client")
-    @patch("app.external.gemini_api.get_settings")
-    def test_initialize_missing_project_id(self, mock_get_settings, mock_genai_client):
-        """google_project_id が未設定の場合に APIError を発生させること"""
-        mock_get_settings.return_value = create_mock_settings(google_project_id=None)
-
-        client = GeminiAPIClient()
-
-        with pytest.raises(APIError) as exc_info:
-            client.initialize()
-
-        assert "GOOGLE_PROJECT_ID" in str(exc_info.value)
+        assert result == ("生成された文書", 2500, 1200)
+        call_kwargs = create.call_args[1]
+        assert call_kwargs["model"] == "gemini-1.5-pro-002"
+        assert "テストカルテ" in call_kwargs["input"]
+        assert call_kwargs["system_instruction"]

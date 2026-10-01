@@ -2,11 +2,11 @@
 
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from unittest.mock import patch
 
 from fastapi import status
 
 from app.models.usage import SummaryUsage
+from tests.integration.conftest import mock_ai_client
 
 JST = ZoneInfo("Asia/Tokyo")
 
@@ -43,12 +43,9 @@ class TestStatisticsAfterGeneration:
         self, integration_client, db_session, csrf_headers
     ):
         """文書生成後に統計サマリが正しく更新される"""
-        with patch(
-            "app.services.summary_service.generate_summary_with_provider",
-            return_value=("生成テキスト", 1200, 600),
-        ):
+        with mock_ai_client("生成テキスト", 1200, 600):
             integration_client.post(
-                "/api/summary/generate",
+                "/api/summary/generate-stream",
                 json={
                     "medical_text": _VALID_MEDICAL_TEXT,
                     "model": "Claude",
@@ -69,12 +66,9 @@ class TestStatisticsAfterGeneration:
     ):
         """複数回の生成結果が統計に累積される"""
         for _ in range(3):
-            with patch(
-                "app.services.summary_service.generate_summary_with_provider",
-                return_value=("テキスト", 500, 200),
-            ):
+            with mock_ai_client("テキスト", 500, 200):
                 integration_client.post(
-                    "/api/summary/generate",
+                    "/api/summary/generate-stream",
                     json={
                         "medical_text": _VALID_MEDICAL_TEXT,
                         "model": "Claude",

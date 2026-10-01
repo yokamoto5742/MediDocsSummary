@@ -48,14 +48,14 @@ class TestCheckDailyLimit:
     """check_daily_limit 関数のテスト"""
 
     @patch("app.services.usage_service.get_daily_usage")
-    @patch("app.services.usage_service.get_settings")
+    @patch("app.services.usage_service.settings")
     def test_check_daily_limit_within_limits(
-        self, mock_get_settings, mock_get_daily_usage
+        self, mock_settings, mock_get_daily_usage
     ):
         """制限内の場合はNoneを返す"""
-        mock_get_settings.return_value.daily_request_limit = 100
-        mock_get_settings.return_value.daily_input_token_limit = 2000000
-        mock_get_settings.return_value.daily_output_token_limit = 100000
+        mock_settings.daily_request_limit = 100
+        mock_settings.daily_input_token_limit = 2000000
+        mock_settings.daily_output_token_limit = 100000
         mock_get_daily_usage.return_value = DailyUsageSummary(
             request_count=50,
             total_input_tokens=1000000,
@@ -67,14 +67,14 @@ class TestCheckDailyLimit:
         assert result is None
 
     @patch("app.services.usage_service.get_daily_usage")
-    @patch("app.services.usage_service.get_settings")
+    @patch("app.services.usage_service.settings")
     def test_check_daily_limit_request_count_exceeded(
-        self, mock_get_settings, mock_get_daily_usage
+        self, mock_settings, mock_get_daily_usage
     ):
         """request_countが制限に達したらエラーメッセージを返す"""
-        mock_get_settings.return_value.daily_request_limit = 100
-        mock_get_settings.return_value.daily_input_token_limit = 2000000
-        mock_get_settings.return_value.daily_output_token_limit = 100000
+        mock_settings.daily_request_limit = 100
+        mock_settings.daily_input_token_limit = 2000000
+        mock_settings.daily_output_token_limit = 100000
         mock_get_daily_usage.return_value = DailyUsageSummary(
             request_count=100,
             total_input_tokens=500000,
@@ -87,14 +87,14 @@ class TestCheckDailyLimit:
         assert result == expected
 
     @patch("app.services.usage_service.get_daily_usage")
-    @patch("app.services.usage_service.get_settings")
+    @patch("app.services.usage_service.settings")
     def test_check_daily_limit_input_token_exceeded(
-        self, mock_get_settings, mock_get_daily_usage
+        self, mock_settings, mock_get_daily_usage
     ):
         """total_input_tokensが制限に達したらエラーメッセージを返す"""
-        mock_get_settings.return_value.daily_request_limit = 100
-        mock_get_settings.return_value.daily_input_token_limit = 2000000
-        mock_get_settings.return_value.daily_output_token_limit = 100000
+        mock_settings.daily_request_limit = 100
+        mock_settings.daily_input_token_limit = 2000000
+        mock_settings.daily_output_token_limit = 100000
         mock_get_daily_usage.return_value = DailyUsageSummary(
             request_count=10,
             total_input_tokens=2000000,
@@ -109,14 +109,14 @@ class TestCheckDailyLimit:
         assert result == expected
 
     @patch("app.services.usage_service.get_daily_usage")
-    @patch("app.services.usage_service.get_settings")
+    @patch("app.services.usage_service.settings")
     def test_check_daily_limit_output_token_exceeded(
-        self, mock_get_settings, mock_get_daily_usage
+        self, mock_settings, mock_get_daily_usage
     ):
         """total_output_tokensが制限に達したらエラーメッセージを返す"""
-        mock_get_settings.return_value.daily_request_limit = 100
-        mock_get_settings.return_value.daily_input_token_limit = 2000000
-        mock_get_settings.return_value.daily_output_token_limit = 100000
+        mock_settings.daily_request_limit = 100
+        mock_settings.daily_input_token_limit = 2000000
+        mock_settings.daily_output_token_limit = 100000
         mock_get_daily_usage.return_value = DailyUsageSummary(
             request_count=10,
             total_input_tokens=500000,
@@ -131,14 +131,14 @@ class TestCheckDailyLimit:
         assert result == expected
 
     @patch("app.services.usage_service.get_daily_usage")
-    @patch("app.services.usage_service.get_settings")
+    @patch("app.services.usage_service.settings")
     def test_check_daily_limit_db_error_returns_none(
-        self, mock_get_settings, mock_get_daily_usage
+        self, mock_settings, mock_get_daily_usage
     ):
         """get_daily_usageが例外を投げた場合、フェイルオープンでNoneを返す"""
-        mock_get_settings.return_value.daily_request_limit = 100
-        mock_get_settings.return_value.daily_input_token_limit = 2000000
-        mock_get_settings.return_value.daily_output_token_limit = 100000
+        mock_settings.daily_request_limit = 100
+        mock_settings.daily_input_token_limit = 2000000
+        mock_settings.daily_output_token_limit = 100000
         mock_get_daily_usage.side_effect = Exception("DB接続エラー")
 
         result = check_daily_limit()
@@ -179,8 +179,8 @@ class TestSaveUsage:
         assert added.app_type == "dischargesummary"
 
     @patch("app.services.usage_service.get_db_session")
-    @patch("logging.error")
-    def test_save_usage_exception_silent(self, mock_logging_error, mock_get_db_session):
+    @patch("app.services.usage_service.logger")
+    def test_save_usage_exception_silent(self, mock_logger, mock_get_db_session):
         """例外発生時: エラーログを出力するが例外は外部に伝播しない"""
         from app.services.usage_service import save_usage
 
@@ -199,4 +199,4 @@ class TestSaveUsage:
             processing_time=3.0,
         )
 
-        mock_logging_error.assert_called_once()
+        mock_logger.error.assert_called_once()

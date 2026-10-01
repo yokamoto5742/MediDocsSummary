@@ -1,10 +1,9 @@
 """統合テスト: プロンプト管理（CRUD + 階層的解決）"""
 
-from unittest.mock import patch
-
 from fastapi import status
 
 from app.models.prompt import Prompt
+from tests.integration.conftest import mock_ai_client, parse_sse_events
 
 _BASE_PROMPT = {
     "department": "内科",
@@ -205,18 +204,9 @@ class TestHierarchicalPromptResolution:
         )
         db_session.commit()
 
-        captured: dict = {}
-
-        def capture_generate(**kwargs):
-            captured["provider"] = kwargs.get("provider", "")
-            return "生成テキスト", 100, 50
-
-        with patch(
-            "app.services.summary_service.generate_summary_with_provider",
-            side_effect=capture_generate,
-        ):
+        with mock_ai_client() as calls:
             response = integration_client.post(
-                "/api/summary/generate",
+                "/api/summary/generate-stream",
                 json={
                     "medical_text": _VALID_MEDICAL_TEXT,
                     "department": "内科",
@@ -229,9 +219,12 @@ class TestHierarchicalPromptResolution:
             )
 
         assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["success"] is True
-        assert data["model_used"] == "Gemini"
+        complete_event = parse_sse_events(response.text)[-1]
+        assert complete_event["type"] == "complete"
+        assert complete_event["data"]["model_used"] == "Gemini"
+        # プロンプトのモデル設定に合わせてGeminiで生成し、プロンプト内容も使う
+        assert calls[0]["model"] == "Gemini"
+        assert "内科プロンプト" in calls[0]["system_prompt"]
 
 
 class TestEvaluationPromptCRUD:

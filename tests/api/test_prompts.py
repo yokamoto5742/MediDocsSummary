@@ -1,5 +1,7 @@
 from fastapi import status
 
+from app.core.constants import MESSAGES
+
 
 def test_list_prompts_empty(client, test_db):
     """プロンプト一覧取得 - 空の場合"""
@@ -73,4 +75,4 @@ def test_delete_prompt_not_found(client, test_db, csrf_headers):
     """プロンプト削除 - 存在しないID"""
     response = client.delete("/api/prompts/9999", headers=csrf_headers)
     assert response.status_code == status.HTTP_404_NOT_FOUND
-    assert "not found" in response.json()["detail"].lower()
+    assert response.json()["detail"] == MESSAGES["ERROR"]["PROMPT_NOT_FOUND"]

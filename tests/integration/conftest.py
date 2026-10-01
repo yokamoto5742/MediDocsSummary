@@ -1,4 +1,5 @@
 import json
+from collections.abc import Iterator
 from contextlib import contextmanager
 
 import pytest
@@ -11,6 +12,7 @@ from unittest.mock import patch
 from app.core.config import Settings, get_settings
 from app.core.database import get_db
 from app.core.security import generate_csrf_token
+from app.external.base_api import BaseAPIClient
 from app.main import app
 from app.models.base import Base
 
@@ -93,7 +95,8 @@ def integration_client(integration_db, monkeypatch):
         patch(
             "app.services.evaluation_service.get_db_session", override_get_db_session
         ),
-        patch("app.services.usage_service.get_settings", return_value=test_settings),
+        patch("app.external.base_api.get_db_session", override_get_db_session),
+        patch("app.services.usage_service.settings", test_settings),
     ):
         yield TestClient(app)
 
@@ -126,3 +129,62 @@ def parse_sse_events(response_text: str) -> list[dict]:
         if event_type and data is not None:
             events.append({"type": event_type, "data": data})
     return events
+
+
+def post_sse(client: TestClient, path: str, payload: dict, headers: dict) -> dict:
+    """SSEエンドポイントにPOSTし、最後のイベント（complete または error）を返す"""
+    response = client.post(path, json=payload, headers=headers)
+    assert response.status_code == 200
+    assert "text/event-stream" in response.headers["content-type"]
+    return parse_sse_events(response.text)[-1]
+
+
+class FakeAIClient(BaseAPIClient):
+    """外部AI APIの代役。プロンプト組み立てなど基底クラスの処理は実コードが動く"""
+
+    def __init__(
+        self, model: str, calls: list[dict], result: tuple[str, int, int], error: Exception | None
+    ):
+        self.model = model
+        self.calls = calls
+        self.result = result
+        self.error = error
+
+    def _generate_content(
+        self, prompt: str, model_name: str, system_prompt: str = ""
+    ) -> tuple[str, int, int]:
+        self.calls.append(
+            {
+                "model": self.model,
+                "model_name": model_name,
+                "system_prompt": system_prompt,
+                "user_message": prompt,
+            }
+        )
+        if self.error:
+            raise self.error
+        return self.result
+
+
+@contextmanager
+def mock_ai_client(
+    text: str = "生成テキスト",
+    input_tokens: int = 100,
+    output_tokens: int = 50,
+    error: Exception | None = None,
+) -> Iterator[list[dict]]:
+    """
+    外部AI APIの呼び出しだけを差し替える
+
+    AIに渡されたモデル種別・モデル名・プロンプトの記録をyieldする
+    """
+    calls: list[dict] = []
+
+    def create_fake_client(model: str) -> FakeAIClient:
+        return FakeAIClient(model, calls, (text, input_tokens, output_tokens), error)
+
+    with (
+        patch("app.services.summary_service.create_client", create_fake_client),
+        patch("app.services.evaluation_service.create_client", create_fake_client),
+    ):
+        yield calls

@@ -4,9 +4,15 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from fastapi import Request
 
 JST = ZoneInfo("Asia/Tokyo")
 audit_logger = logging.getLogger("audit")
+
+
+def get_client_ip(request: Request) -> str | None:
+    """監査ログ用にリクエスト元IPを取得（APIの依存関数として使用）"""
+    return request.client.host if request.client else None
 
 
 def log_audit_event(
