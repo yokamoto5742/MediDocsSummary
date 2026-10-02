@@ -7,6 +7,12 @@
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-02
+
+### 修正
+
+- **APIクライアント更新への追従**: Gemini Interactions API 移行と Anthropic SDK 1.x 対応により、未定義メッセージ参照エラーを修正。空レスポンス処理を統一し、テストケースを拡充
+
 ## [1.2.0] - 2026-10-01
 
 ### 変更
@@ -143,7 +149,9 @@
 - **README ドキュメント**: 不要な設定項目を削除し、ドキュメント品質を改善
 - **依存関係**: requirements.txt を更新し、最新のライブラリバージョンに対応
 
-[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/yourusername/MediDocsSummary/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.2.0...v1.2.1
+[1.2.0]: https://github.com/yourusername/MediDocsSummary/compare/v1.1.1...v1.2.0
 [1.1.1]: https://github.com/yourusername/MediDocsSummary/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.3...v1.1.0
 [1.0.3]: https://github.com/yourusername/MediDocsSummary/compare/v1.0.2...v1.0.3
